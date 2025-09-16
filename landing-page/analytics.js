@@ -82,14 +82,7 @@ class LandingAnalytics {
                 this.logEvent('form_click', { element: 'email_form' });
             });
 
-            const nameInput = document.getElementById('name');
             const emailInput = document.getElementById('email');
-
-            if (nameInput) {
-                nameInput.addEventListener('focus', () => {
-                    this.logEvent('input_focus', { field: 'name' });
-                });
-            }
 
             if (emailInput) {
                 emailInput.addEventListener('focus', () => {

@@ -30,7 +30,7 @@ Meet Your Baby Landing Page
 자동 알림 시스템
 ```
 
-3. Template ID 확인 (예: `template_abc123`)
+3. Template ID 확인: `template_oux9mo6`
 
 ## 2. 코드 업데이트
 
@@ -43,14 +43,14 @@ Meet Your Baby Landing Page
 })();
 
 // 이메일 전송 부분
-// await emailjs.send('YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', templateParams);
-await emailjs.send('service_gmail123', 'template_abc123', templateParams);
+// await emailjs.send('YOUR_SERVICE_ID', 'template_oux9mo6', templateParams);
+await emailjs.send('YOUR_SERVICE_ID', 'template_oux9mo6', templateParams);
 ```
 
 ### 실제 설정값:
-- `YOUR_PUBLIC_KEY`: EmailJS Dashboard → Account → Public Key
-- `YOUR_SERVICE_ID`: Gmail 서비스 ID
-- `YOUR_TEMPLATE_ID`: 생성한 템플릿 ID
+- `YOUR_PUBLIC_KEY`: `LskYXC4NfFvgvIXJx` ✅ (설정 완료)
+- `YOUR_SERVICE_ID`: `service_z0baz5r` ✅ (설정 완료)
+- `YOUR_TEMPLATE_ID`: `template_oux9mo6` ✅ (설정 완료)
 
 ## 3. 테스트
 

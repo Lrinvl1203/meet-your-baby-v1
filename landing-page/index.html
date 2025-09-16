@@ -274,6 +274,158 @@
             display: none;
         }
 
+        /* Video Demo Section */
+        .video-demo {
+            padding: 6rem 2rem;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .video-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .video-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin-bottom: 1rem;
+        }
+
+        .video-subtitle {
+            font-size: 1.2rem;
+            color: var(--text-light);
+            margin-bottom: 3rem;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .video-wrapper {
+            position: relative;
+            background: white;
+            border-radius: 20px;
+            padding: 1.5rem;
+            box-shadow: var(--shadow-xl);
+            margin-bottom: 3rem;
+            overflow: hidden;
+        }
+
+        .video-wrapper::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            padding: 3px;
+            background: var(--gradient-main);
+            border-radius: 20px;
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask-composite: subtract;
+            z-index: 1;
+        }
+
+        #demoVideo {
+            width: 100%;
+            max-width: 900px;
+            height: auto;
+            border-radius: 15px;
+            position: relative;
+            z-index: 2;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .play-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 3;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .video-wrapper:hover .play-overlay {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .play-button {
+            width: 100px;
+            height: 100px;
+            background: var(--gradient-main);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1rem;
+            box-shadow: var(--shadow-xl);
+            transition: transform 0.3s ease;
+        }
+
+        .play-button:hover {
+            transform: scale(1.1);
+        }
+
+        .play-button i {
+            color: white;
+            font-size: 2rem;
+            margin-left: 5px;
+        }
+
+        .play-text {
+            color: var(--text-dark);
+            font-weight: 600;
+            background: rgba(255,255,255,0.95);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .video-highlights {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .highlight-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1.5rem;
+            background: white;
+            border-radius: 15px;
+            box-shadow: var(--shadow-soft);
+            transition: transform 0.3s ease;
+        }
+
+        .highlight-item:hover {
+            transform: translateY(-5px);
+        }
+
+        .highlight-item i {
+            width: 50px;
+            height: 50px;
+            background: var(--gradient-main);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+
+        .highlight-item span {
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
         /* Features Section */
         .features {
             padding: 6rem 2rem;
@@ -451,11 +603,6 @@
                 <p class="form-subtitle">서비스 오픈 시 가장 먼저 알려드릴게요</p>
 
                 <div class="input-group">
-                    <input type="text" id="name" name="name" required placeholder=" ">
-                    <label for="name">이름</label>
-                </div>
-
-                <div class="input-group">
                     <input type="email" id="email" name="email" required placeholder=" ">
                     <label for="email">이메일 주소</label>
                 </div>
@@ -469,6 +616,52 @@
                     🎉 등록이 완료되었습니다! 출시 소식을 가장 먼저 알려드릴게요.
                 </div>
             </form>
+        </div>
+    </section>
+
+    <!-- Video Demo Section -->
+    <section class="video-demo">
+        <div class="video-container">
+            <h2 class="video-title">🎬 실제 작동 모습을 확인해보세요!</h2>
+            <p class="video-subtitle">AI가 부모님의 사진으로 아기 얼굴을 예측하는 과정을 직접 보실 수 있어요</p>
+
+            <div class="video-wrapper">
+                <video
+                    id="demoVideo"
+                    controls
+                    poster="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAwIiBoZWlnaHQ9IjQ1MCIgdmlld0JveD0iMCAwIDgwMCA0NTAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjgwMCIgaGVpZ2h0PSI0NTAiIGZpbGw9InVybCgjZ3JhZGllbnQpIi8+PGNpcmNsZSBjeD0iNDAwIiBjeT0iMjI1IiByPSI2MCIgZmlsbD0id2hpdGUiIGZpbGwtb3BhY2l0eT0iMC45Ii8+PHBhdGggZD0iTTM3MCAyMDVMMzk1IDE5MEw0MzAgMjI1TDM5NSAyNjBMMzcwIDI0NVYyMDVaIiBmaWxsPSIjRkY2OUI0Ii8+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJncmFkaWVudCIgeDE9IjAiIHkxPSIwIiB4Mj0iODAwIiB5Mj0iNDUwIiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHN0b3Agc3RvcC1jb2xvcj0iI0ZGRTFFQyIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iI0UzRjJGRCIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjx0ZXh0IHg9IjQwMCIgeT0iMzAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjNkI3MjgwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMjAiPkFJIOyVhOq4sCDslbzqtbUg7Jik7YWh IOyLpOyglOyYgOyDgTwvdGV4dD48L3N2Zz4="
+                    preload="metadata">
+                    <source src="meetyourbaby_상세.mp4" type="video/mp4">
+                    죄송합니다. 브라우저에서 동영상을 지원하지 않습니다.
+                </video>
+
+                <!-- Play button overlay -->
+                <div class="play-overlay" id="playOverlay">
+                    <div class="play-button">
+                        <i class="fas fa-play"></i>
+                    </div>
+                    <p class="play-text">클릭하여 데모 영상 시청하기</p>
+                </div>
+            </div>
+
+            <div class="video-highlights">
+                <div class="highlight-item">
+                    <i class="fas fa-upload"></i>
+                    <span>부모님 사진 업로드</span>
+                </div>
+                <div class="highlight-item">
+                    <i class="fas fa-sliders-h"></i>
+                    <span>닮음 정도 조절</span>
+                </div>
+                <div class="highlight-item">
+                    <i class="fas fa-magic"></i>
+                    <span>AI 얼굴 생성</span>
+                </div>
+                <div class="highlight-item">
+                    <i class="fas fa-heart"></i>
+                    <span>결과 확인</span>
+                </div>
+            </div>
         </div>
     </section>
 
@@ -516,7 +709,7 @@
     <script>
         // EmailJS 초기화
         (function(){
-            emailjs.init("YOUR_PUBLIC_KEY"); // EmailJS 공개 키 설정 필요
+            emailjs.init("LskYXC4NfFvgvIXJx"); // EmailJS 공개 키 설정 완료
         })();
 
         // 방문자 추적
@@ -545,7 +738,6 @@
         document.getElementById('emailForm').addEventListener('submit', async function(e) {
             e.preventDefault();
 
-            const name = document.getElementById('name').value;
             const email = document.getElementById('email').value;
             const submitBtn = document.getElementById('submitBtn');
             const btnText = submitBtn.querySelector('.btn-text');
@@ -560,11 +752,10 @@
                 // EmailJS로 이메일 전송 (실제 설정 시 템플릿 ID와 서비스 ID 필요)
                 const templateParams = {
                     to_email: 'lrinvl1203@gmail.com',
-                    from_name: name,
+                    from_name: '베타 테스터',
                     from_email: email,
                     message: `새로운 베타 테스터 등록:
 
-이름: ${name}
 이메일: ${email}
 등록 시간: ${new Date().toLocaleString('ko-KR')}
 브라우저: ${navigator.userAgent}
@@ -572,13 +763,12 @@
                     subject: '🍼 Meet Your Baby - 새 베타 테스터 등록'
                 };
 
-                // EmailJS 전송 (서비스 설정 후 활성화)
-                // await emailjs.send('YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', templateParams);
+                // EmailJS 전송
+                await emailjs.send('service_z0baz5r', 'template_oux9mo6', templateParams);
 
                 // 임시로 로컬 스토리지에 저장
                 let subscribers = JSON.parse(localStorage.getItem('subscribers') || '[]');
                 subscribers.push({
-                    name,
                     email,
                     timestamp: new Date().toISOString(),
                     userAgent: navigator.userAgent
@@ -590,7 +780,7 @@
                 document.getElementById('emailForm').reset();
 
                 // 관리자 콘솔 로그 (개발용)
-                console.log('새 구독자:', { name, email });
+                console.log('새 구독자:', { email });
                 console.log('총 구독자 수:', subscribers.length);
 
             } catch (error) {
@@ -604,9 +794,93 @@
             spinner.style.display = 'none';
         });
 
+        // 동영상 상호작용 추적
+        function setupVideoTracking() {
+            const video = document.getElementById('demoVideo');
+            const playOverlay = document.getElementById('playOverlay');
+
+            if (video && playOverlay) {
+                // 플레이 오버레이 클릭
+                playOverlay.addEventListener('click', function() {
+                    video.play();
+                    playOverlay.style.opacity = '0';
+                    playOverlay.style.pointerEvents = 'none';
+
+                    // 분석 추적
+                    if (typeof analytics !== 'undefined') {
+                        analytics.logEvent('video_play_overlay_click', {
+                            timestamp: Date.now() - analytics.startTime
+                        });
+                    }
+                });
+
+                // 동영상 이벤트 추적
+                video.addEventListener('play', function() {
+                    if (typeof analytics !== 'undefined') {
+                        analytics.logEvent('video_play', {
+                            currentTime: video.currentTime,
+                            timeOnPage: Date.now() - analytics.startTime
+                        });
+                    }
+                });
+
+                video.addEventListener('pause', function() {
+                    if (typeof analytics !== 'undefined') {
+                        analytics.logEvent('video_pause', {
+                            currentTime: video.currentTime,
+                            watchedDuration: video.currentTime
+                        });
+                    }
+                });
+
+                video.addEventListener('ended', function() {
+                    if (typeof analytics !== 'undefined') {
+                        analytics.logEvent('video_completed', {
+                            duration: video.duration,
+                            watchedDuration: video.currentTime
+                        });
+                    }
+                });
+
+                // 시간별 시청 추적 (25%, 50%, 75%, 100%)
+                video.addEventListener('timeupdate', function() {
+                    if (video.duration > 0) {
+                        const progress = Math.round((video.currentTime / video.duration) * 100);
+
+                        if ([25, 50, 75].includes(progress)) {
+                            if (typeof analytics !== 'undefined') {
+                                analytics.logEvent('video_progress', {
+                                    progress: progress,
+                                    currentTime: video.currentTime,
+                                    duration: video.duration
+                                });
+                            }
+                        }
+                    }
+                });
+
+                // 동영상 로드 완료 시 오버레이 표시
+                video.addEventListener('loadeddata', function() {
+                    playOverlay.style.opacity = '0';
+                    video.addEventListener('mouseenter', function() {
+                        if (video.paused) {
+                            playOverlay.style.opacity = '1';
+                        }
+                    });
+
+                    video.addEventListener('mouseleave', function() {
+                        if (video.paused) {
+                            playOverlay.style.opacity = '0';
+                        }
+                    });
+                });
+            }
+        }
+
         // 페이지 로드 시 방문자 추적
         document.addEventListener('DOMContentLoaded', function() {
             trackVisitor();
+            setupVideoTracking();
 
             // 관리자 콘솔에 통계 표시
             const visitors = JSON.parse(localStorage.getItem('visitors') || '[]');
@@ -623,7 +897,6 @@
             const subscribers = JSON.parse(localStorage.getItem('subscribers') || '[]');
 
             console.table(subscribers.map(s => ({
-                이름: s.name,
                 이메일: s.email,
                 등록시간: new Date(s.timestamp).toLocaleString('ko-KR')
             })));
