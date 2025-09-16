@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meet Your Baby - AI 아기 얼굴 예측 서비스</title>
+    <meta name="description" content="AI가 예측하는 미래 아기의 모습을 만나보세요. 부모의 사진으로 아기 얼굴을 미리 볼 수 있는 혁신적인 서비스">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Meet Your Baby - AI 아기 얼굴 예측">
+    <meta property="og:description" content="AI가 예측하는 미래 아기의 모습을 만나보세요">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="https://via.placeholder.com/1200x630/FFB6D3/FFFFFF?text=Meet+Your+Baby">
+
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800&family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+    <!-- EmailJS -->
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+
+    <!-- Analytics -->
+    <script src="analytics.js"></script>
+
+    <style>
+        :root {
+            --primary-pink: #FF69B4;
+            --primary-blue: #4FC3F7;
+            --soft-pink: #FFE1EC;
+            --soft-blue: #E3F2FD;
+            --warm-white: #FEFEFE;
+            --text-dark: #2E3A59;
+            --text-light: #6B7280;
+            --gradient-main: linear-gradient(135deg, #FF69B4 0%, #4FC3F7 100%);
+            --gradient-soft: linear-gradient(135deg, #FFE1EC 0%, #E3F2FD 100%);
+            --shadow-soft: 0 10px 30px rgba(0,0,0,0.1);
+            --shadow-hover: 0 15px 40px rgba(0,0,0,0.15);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans KR', 'Poppins', sans-serif;
+            line-height: 1.6;
+            color: var(--text-dark);
+            overflow-x: hidden;
+        }
+
+        /* Background Animation */
+        .bg-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            opacity: 0.7;
+        }
+
+        .floating-heart {
+            position: absolute;
+            color: var(--primary-pink);
+            animation: float 6s ease-in-out infinite;
+            opacity: 0.3;
+        }
+
+        .floating-heart:nth-child(1) { top: 10%; left: 10%; animation-delay: 0s; }
+        .floating-heart:nth-child(2) { top: 20%; right: 10%; animation-delay: 1s; }
+        .floating-heart:nth-child(3) { bottom: 20%; left: 15%; animation-delay: 2s; }
+        .floating-heart:nth-child(4) { bottom: 30%; right: 20%; animation-delay: 3s; }
+        .floating-heart:nth-child(5) { top: 50%; left: 5%; animation-delay: 4s; }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            25% { transform: translateY(-20px) rotate(5deg); }
+            75% { transform: translateY(20px) rotate(-5deg); }
+        }
+
+        /* Header */
+        .header {
+            background: var(--gradient-main);
+            padding: 1rem 0;
+            box-shadow: var(--shadow-soft);
+            position: relative;
+        }
+
+        .nav {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: white;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .logo i {
+            font-size: 2rem;
+        }
+
+        .nav-right {
+            color: white;
+            font-weight: 500;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: var(--gradient-soft);
+            padding: 6rem 2rem 4rem;
+            text-align: center;
+            position: relative;
+            min-height: 90vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .hero-content {
+            max-width: 800px;
+            z-index: 2;
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            background: var(--gradient-main);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 1.5rem;
+            line-height: 1.2;
+        }
+
+        .hero .subtitle {
+            font-size: 1.3rem;
+            color: var(--text-light);
+            margin-bottom: 2rem;
+            font-weight: 400;
+        }
+
+        .hero .description {
+            font-size: 1.1rem;
+            color: var(--text-dark);
+            margin-bottom: 3rem;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* Email Form */
+        .email-form {
+            background: white;
+            padding: 2.5rem;
+            border-radius: 20px;
+            box-shadow: var(--shadow-soft);
+            max-width: 500px;
+            margin: 0 auto;
+            border: 2px solid transparent;
+            background-clip: padding-box;
+            position: relative;
+        }
+
+        .email-form::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            padding: 2px;
+            background: var(--gradient-main);
+            border-radius: 20px;
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask-composite: subtract;
+            z-index: -1;
+        }
+
+        .form-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin-bottom: 0.5rem;
+        }
+
+        .form-subtitle {
+            color: var(--text-light);
+            margin-bottom: 2rem;
+            font-size: 0.95rem;
+        }
+
+        .input-group {
+            margin-bottom: 1.5rem;
+            position: relative;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 1rem 1.2rem;
+            border: 2px solid #E5E7EB;
+            border-radius: 12px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: var(--primary-pink);
+            box-shadow: 0 0 0 3px rgba(255, 105, 180, 0.1);
+        }
+
+        .input-group label {
+            position: absolute;
+            left: 1.2rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-light);
+            transition: all 0.3s ease;
+            pointer-events: none;
+            background: white;
+            padding: 0 0.5rem;
+        }
+
+        .input-group input:focus + label,
+        .input-group input:not(:placeholder-shown) + label {
+            top: 0;
+            font-size: 0.85rem;
+            color: var(--primary-pink);
+            font-weight: 500;
+        }
+
+        .submit-btn {
+            width: 100%;
+            background: var(--gradient-main);
+            border: none;
+            padding: 1.2rem;
+            border-radius: 12px;
+            color: white;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-hover);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .success-message {
+            background: #D1FAE5;
+            color: #065F46;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+            display: none;
+        }
+
+        /* Features Section */
+        .features {
+            padding: 6rem 2rem;
+            background: white;
+        }
+
+        .features-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .features h2 {
+            text-align: center;
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin-bottom: 3rem;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2.5rem;
+        }
+
+        .feature-card {
+            text-align: center;
+            padding: 2.5rem 1.5rem;
+            border-radius: 20px;
+            background: var(--gradient-soft);
+            transition: transform 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .feature-icon {
+            width: 80px;
+            height: 80px;
+            background: var(--gradient-main);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem;
+            font-size: 2rem;
+            color: white;
+        }
+
+        .feature-card h3 {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 1rem;
+        }
+
+        .feature-card p {
+            color: var(--text-light);
+            line-height: 1.6;
+        }
+
+        /* Beta Badge */
+        .beta-badge {
+            position: fixed;
+            top: 100px;
+            right: -30px;
+            background: var(--gradient-main);
+            color: white;
+            padding: 0.5rem 2rem;
+            transform: rotate(45deg);
+            font-weight: 600;
+            font-size: 0.9rem;
+            z-index: 1000;
+            box-shadow: var(--shadow-soft);
+        }
+
+        /* Footer */
+        .footer {
+            background: var(--text-dark);
+            color: white;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        /* Hidden visitor counter */
+        .visitor-info {
+            position: absolute;
+            top: -9999px;
+            left: -9999px;
+            opacity: 0;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+
+            .hero .subtitle {
+                font-size: 1.1rem;
+            }
+
+            .email-form {
+                padding: 2rem;
+                margin: 0 1rem;
+            }
+
+            .features {
+                padding: 4rem 1rem;
+            }
+
+            .nav {
+                padding: 0 1rem;
+            }
+        }
+
+        /* Loading Animation */
+        .loading-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top: 2px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            display: none;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Background Animation -->
+    <div class="bg-animation">
+        <i class="fas fa-heart floating-heart"></i>
+        <i class="fas fa-baby floating-heart"></i>
+        <i class="fas fa-heart floating-heart"></i>
+        <i class="fas fa-star floating-heart"></i>
+        <i class="fas fa-heart floating-heart"></i>
+    </div>
+
+    <!-- Beta Badge -->
+    <div class="beta-badge">BETA</div>
+
+    <!-- Header -->
+    <header class="header">
+        <nav class="nav">
+            <a href="#" class="logo">
+                <i class="fas fa-baby"></i>
+                Meet Your Baby
+            </a>
+            <div class="nav-right">
+                Coming Soon
+            </div>
+        </nav>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-content">
+            <h1>당신의 미래 아기를<br>AI로 미리 만나보세요</h1>
+            <p class="subtitle">🤱 부모의 사진으로 예측하는 마법 같은 순간</p>
+            <p class="description">
+                최첨단 AI 기술로 부모님의 얼굴 특징을 분석하여<br>
+                미래 아기의 모습을 사실적으로 예측해드립니다.<br>
+                성장 과정별 모습까지 확인할 수 있어요!
+            </p>
+
+            <!-- Email Collection Form -->
+            <form class="email-form" id="emailForm">
+                <h3 class="form-title">✨ 베타 출시 알림받기</h3>
+                <p class="form-subtitle">서비스 오픈 시 가장 먼저 알려드릴게요</p>
+
+                <div class="input-group">
+                    <input type="text" id="name" name="name" required placeholder=" ">
+                    <label for="name">이름</label>
+                </div>
+
+                <div class="input-group">
+                    <input type="email" id="email" name="email" required placeholder=" ">
+                    <label for="email">이메일 주소</label>
+                </div>
+
+                <button type="submit" class="submit-btn" id="submitBtn">
+                    <span class="btn-text">무료로 알림 받기</span>
+                    <div class="loading-spinner"></div>
+                </button>
+
+                <div class="success-message" id="successMessage">
+                    🎉 등록이 완료되었습니다! 출시 소식을 가장 먼저 알려드릴게요.
+                </div>
+            </form>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features">
+        <div class="features-container">
+            <h2>🌟 특별한 기능들</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-magic"></i>
+                    </div>
+                    <h3>AI 얼굴 예측</h3>
+                    <p>최신 AI 기술로 부모의 얼굴 특징을 분석하여 아기 얼굴을 정확하게 예측합니다</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <h3>성장 과정 시뮬레이션</h3>
+                    <p>신생아부터 5살까지 나이별 모습을 확인하며 아이의 성장 과정을 미리 볼 수 있어요</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-sliders-h"></i>
+                    </div>
+                    <h3>닮음 정도 조절</h3>
+                    <p>눈, 코, 입 등 얼굴 부위별로 엄마·아빠 닮음 정도를 세밀하게 조절할 수 있습니다</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>&copy; 2024 Meet Your Baby. All rights reserved.</p>
+        <p>문의: lrinvl1203@gmail.com</p>
+    </footer>
+
+    <!-- Hidden visitor tracking -->
+    <div class="visitor-info" id="visitorInfo"></div>
+
+    <script>
+        // EmailJS 초기화
+        (function(){
+            emailjs.init("YOUR_PUBLIC_KEY"); // EmailJS 공개 키 설정 필요
+        })();
+
+        // 방문자 추적
+        function trackVisitor() {
+            const now = new Date();
+            const visitorData = {
+                timestamp: now.toISOString(),
+                userAgent: navigator.userAgent,
+                language: navigator.language,
+                screen: `${screen.width}x${screen.height}`,
+                referrer: document.referrer || 'direct',
+                url: window.location.href
+            };
+
+            // 로컬 스토리지에 방문 기록 저장
+            let visitors = JSON.parse(localStorage.getItem('visitors') || '[]');
+            visitors.push(visitorData);
+            localStorage.setItem('visitors', JSON.stringify(visitors));
+
+            // 관리자에게 방문 알림 (선택적)
+            console.log('방문자 정보:', visitorData);
+            document.getElementById('visitorInfo').innerHTML = `방문자 수: ${visitors.length}`;
+        }
+
+        // 이메일 폼 제출
+        document.getElementById('emailForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const name = document.getElementById('name').value;
+            const email = document.getElementById('email').value;
+            const submitBtn = document.getElementById('submitBtn');
+            const btnText = submitBtn.querySelector('.btn-text');
+            const spinner = submitBtn.querySelector('.loading-spinner');
+
+            // 로딩 상태
+            submitBtn.disabled = true;
+            btnText.style.display = 'none';
+            spinner.style.display = 'inline-block';
+
+            try {
+                // EmailJS로 이메일 전송 (실제 설정 시 템플릿 ID와 서비스 ID 필요)
+                const templateParams = {
+                    to_email: 'lrinvl1203@gmail.com',
+                    from_name: name,
+                    from_email: email,
+                    message: `새로운 베타 테스터 등록:
+
+이름: ${name}
+이메일: ${email}
+등록 시간: ${new Date().toLocaleString('ko-KR')}
+브라우저: ${navigator.userAgent}
+페이지: ${window.location.href}`,
+                    subject: '🍼 Meet Your Baby - 새 베타 테스터 등록'
+                };
+
+                // EmailJS 전송 (서비스 설정 후 활성화)
+                // await emailjs.send('YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', templateParams);
+
+                // 임시로 로컬 스토리지에 저장
+                let subscribers = JSON.parse(localStorage.getItem('subscribers') || '[]');
+                subscribers.push({
+                    name,
+                    email,
+                    timestamp: new Date().toISOString(),
+                    userAgent: navigator.userAgent
+                });
+                localStorage.setItem('subscribers', JSON.stringify(subscribers));
+
+                // 성공 메시지 표시
+                document.getElementById('successMessage').style.display = 'block';
+                document.getElementById('emailForm').reset();
+
+                // 관리자 콘솔 로그 (개발용)
+                console.log('새 구독자:', { name, email });
+                console.log('총 구독자 수:', subscribers.length);
+
+            } catch (error) {
+                console.error('이메일 전송 실패:', error);
+                alert('등록 중 오류가 발생했습니다. 다시 시도해주세요.');
+            }
+
+            // 로딩 상태 해제
+            submitBtn.disabled = false;
+            btnText.style.display = 'inline';
+            spinner.style.display = 'none';
+        });
+
+        // 페이지 로드 시 방문자 추적
+        document.addEventListener('DOMContentLoaded', function() {
+            trackVisitor();
+
+            // 관리자 콘솔에 통계 표시
+            const visitors = JSON.parse(localStorage.getItem('visitors') || '[]');
+            const subscribers = JSON.parse(localStorage.getItem('subscribers') || '[]');
+            console.log(`=== Meet Your Baby 랜딩페이지 통계 ===`);
+            console.log(`총 방문자 수: ${visitors.length}`);
+            console.log(`구독자 수: ${subscribers.length}`);
+            console.log(`전환율: ${visitors.length > 0 ? (subscribers.length / visitors.length * 100).toFixed(1) : 0}%`);
+        });
+
+        // 관리자 전용: 통계 확인 함수 (콘솔에서 stats() 입력)
+        window.stats = function() {
+            const visitors = JSON.parse(localStorage.getItem('visitors') || '[]');
+            const subscribers = JSON.parse(localStorage.getItem('subscribers') || '[]');
+
+            console.table(subscribers.map(s => ({
+                이름: s.name,
+                이메일: s.email,
+                등록시간: new Date(s.timestamp).toLocaleString('ko-KR')
+            })));
+
+            return {
+                총방문자: visitors.length,
+                구독자: subscribers.length,
+                전환율: `${visitors.length > 0 ? (subscribers.length / visitors.length * 100).toFixed(1) : 0}%`,
+                최근방문: visitors.slice(-5).map(v => new Date(v.timestamp).toLocaleString('ko-KR'))
+            };
+        };
+    </script>
+</body>
+</html>
