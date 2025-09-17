@@ -17,7 +17,10 @@
       "Bash(python:*)",
       "Bash(npx http-server:*)",
       "mcp__playwright__browser_evaluate",
-      "mcp__playwright__browser_handle_dialog"
+      "mcp__playwright__browser_handle_dialog",
+      "mcp__playwright__browser_fill_form",
+      "mcp__playwright__browser_wait_for",
+      "mcp__playwright__browser_console_messages"
     ],
     "deny": [],
     "ask": []
