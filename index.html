@@ -123,7 +123,7 @@
             margin: 0 auto 2rem auto;
         }
         .mode-btn {
-            width: 50%;
+            flex: 1;
             padding: 0.5rem;
             font-size: 0.875rem;
             font-weight: 500;
@@ -422,6 +422,43 @@
         }
         .download-btn:hover { background-color: var(--color-primary-hover); }
 
+        /* 초음파 비교 결과 스타일 */
+        .ultrasound-comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            align-items: start;
+        }
+        .ultrasound-comparison .comparison-section {
+            background-color: #f9fafb;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            border: 1px solid var(--color-border);
+        }
+        .ultrasound-comparison .comparison-header {
+            background-color: var(--color-primary);
+            color: white;
+            padding: 0.75rem;
+            text-align: center;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+        .ultrasound-comparison .comparison-image {
+            width: 100%;
+            display: block;
+            aspect-ratio: 1;
+            object-fit: cover;
+        }
+        .ultrasound-comparison .comparison-footer {
+            padding: 0.75rem;
+            text-align: center;
+        }
+        .ultrasound-comparison .download-btn {
+            width: 100%;
+            padding: 0.5rem;
+            font-size: 0.875rem;
+        }
+
         .modal-actions { margin-top: 1.5rem; text-align: center; }
         .btn-secondary {
             padding: 0.5rem 1rem;
@@ -474,13 +511,29 @@
                 <!-- Upload Mode Selection -->
                 <div class="mb-8">
                     <h3>사진을 어떻게 업로드 하시겠어요?</h3>
-                    <div class="mode-selector">
+                    <div class="mode-selector" style="max-width: 36rem;">
+                        <button id="ultrasound-mode" class="mode-btn">초음파 사진</button>
                         <button id="separate-mode" class="mode-btn active">부모님 각각</button>
                         <button id="together-mode" class="mode-btn">부모님 함께</button>
                     </div>
                 </div>
 
                 <!-- Photo Upload Sections -->
+                <div id="ultrasound-upload" style="max-width: 42rem; margin: 0 auto 2rem auto; display: none;">
+                    <div class="upload-section">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4 text-center">초음파 사진</h3>
+                        <div class="upload-area">
+                            <input type="file" id="ultrasound-files" multiple accept="image/*" class="hidden">
+                            <label for="ultrasound-files" class="upload-label">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <span style="font-size: 1.125rem; color: #4b5563;">초음파 사진 선택</span>
+                                <span style="font-size: 0.875rem; color: #6b7280; margin-top: 0.5rem;">아기의 3D/4D 초음파 사진을 업로드하세요</span>
+                            </label>
+                        </div>
+                        <div id="ultrasound-previews" class="preview-container"></div>
+                    </div>
+                </div>
+
                 <div id="separate-upload" class="upload-grid">
                     <div id="father-upload" class="upload-section">
                         <h3 class="text-lg font-semibold text-gray-800 mb-4 text-center">아빠 사진</h3>
@@ -764,6 +817,7 @@
                 this.fatherImages = [];
                 this.motherImages = [];
                 this.togetherImages = [];
+                this.ultrasoundImages = [];
 
                 // 설정
                 this.settings = {
@@ -832,6 +886,7 @@
                 });
 
                 // 모드 선택
+                document.getElementById('ultrasound-mode').addEventListener('click', () => this.setInputMode('ultrasound'));
                 document.getElementById('separate-mode').addEventListener('click', () => this.setInputMode('separate'));
                 document.getElementById('together-mode').addEventListener('click', () => this.setInputMode('together'));
 
@@ -839,6 +894,7 @@
                 document.getElementById('father-files').addEventListener('change', (e) => this.handleFileUpload(e, 'father'));
                 document.getElementById('mother-files').addEventListener('change', (e) => this.handleFileUpload(e, 'mother'));
                 document.getElementById('together-files').addEventListener('change', (e) => this.handleFileUpload(e, 'together'));
+                document.getElementById('ultrasound-files').addEventListener('change', (e) => this.handleFileUpload(e, 'ultrasound'));
 
                 // 설정
                 document.getElementById('ethnicity').addEventListener('input', (e) => this.updateSetting('ethnicity', e.target.value));
@@ -932,10 +988,27 @@
 
             setInputMode(mode) {
                 this.inputMode = mode;
+                document.getElementById('ultrasound-mode').classList.toggle('active', mode === 'ultrasound');
                 document.getElementById('separate-mode').classList.toggle('active', mode === 'separate');
                 document.getElementById('together-mode').classList.toggle('active', mode === 'together');
+                document.getElementById('ultrasound-upload').style.display = mode === 'ultrasound' ? 'block' : 'none';
                 document.getElementById('separate-upload').style.display = mode === 'separate' ? 'grid' : 'none';
                 document.getElementById('together-upload').style.display = mode === 'together' ? 'block' : 'none';
+
+                // 초음파 모드에서는 닮은꼴 설정 섹션 숨기기
+                const resemblanceSection = document.querySelector('.settings-grid > div:last-child');
+                if (resemblanceSection) {
+                    resemblanceSection.style.display = mode === 'ultrasound' ? 'none' : 'block';
+                }
+
+                // 초음파 모드에서는 생성 버튼 텍스트 변경
+                const generateBtn = document.getElementById('generate-btn');
+                if (mode === 'ultrasound') {
+                    generateBtn.querySelector('span').textContent = '아기 얼굴 예측하기';
+                } else {
+                    generateBtn.querySelector('span').textContent = '아기 얼굴 예측하기';
+                }
+
                 this.updateGenerateButton();
             }
 
@@ -1059,7 +1132,10 @@
             async handleFileUpload(event, type) {
                 const files = event.target.files;
                 if (!files || files.length === 0) return;
-                const targetArray = type === 'father' ? this.fatherImages : type === 'mother' ? this.motherImages : this.togetherImages;
+                const targetArray = type === 'father' ? this.fatherImages :
+                                  type === 'mother' ? this.motherImages :
+                                  type === 'together' ? this.togetherImages :
+                                  this.ultrasoundImages;
                 for (let file of files) {
                     if (file.type.startsWith('image/')) {
                         try {
@@ -1092,7 +1168,10 @@
 
             renderPreviews(type) {
                 const container = document.getElementById(`${type}-previews`);
-                const images = type === 'father' ? this.fatherImages : type === 'mother' ? this.motherImages : this.togetherImages;
+                const images = type === 'father' ? this.fatherImages :
+                              type === 'mother' ? this.motherImages :
+                              type === 'together' ? this.togetherImages :
+                              this.ultrasoundImages;
                 container.innerHTML = '';
                 images.forEach(image => {
                     const previewDiv = document.createElement('div');
@@ -1103,7 +1182,14 @@
                     img.alt = 'preview';
                     const contentDiv = document.createElement('div');
                     contentDiv.className = 'preview-content';
-                    if (type === 'together') {
+                    if (type === 'ultrasound') {
+                        contentDiv.innerHTML = `
+                            <div>
+                                <label style="font-size: 0.75rem; font-weight: 500; color: #6b7280;">초음파 사진</label>
+                                <p style="font-size: 0.75rem; color: #6b7280; margin: 0.25rem 0 0 0;">3D/4D 초음파 이미지</p>
+                            </div>
+                        `;
+                    } else if (type === 'together') {
                         contentDiv.innerHTML = `
                             <div style="display: flex; gap: 0.5rem;">
                                 <div style="flex: 1;">
@@ -1136,7 +1222,7 @@
             }
 
             updateImageAge(imageId, ageType, value) {
-                const allImages = [...this.fatherImages, ...this.motherImages, ...this.togetherImages];
+                const allImages = [...this.fatherImages, ...this.motherImages, ...this.togetherImages, ...this.ultrasoundImages];
                 const image = allImages.find(img => img.id === imageId);
                 if (image) image[ageType] = value;
             }
@@ -1144,14 +1230,17 @@
             removeImage(imageId, type) {
                 if (type === 'father') this.fatherImages = this.fatherImages.filter(img => img.id !== imageId);
                 else if (type === 'mother') this.motherImages = this.motherImages.filter(img => img.id !== imageId);
-                else this.togetherImages = this.togetherImages.filter(img => img.id !== imageId);
+                else if (type === 'together') this.togetherImages = this.togetherImages.filter(img => img.id !== imageId);
+                else if (type === 'ultrasound') this.ultrasoundImages = this.ultrasoundImages.filter(img => img.id !== imageId);
                 this.renderPreviews(type);
                 this.updateGenerateButton();
             }
 
             updateGenerateButton() {
                 const button = document.getElementById('generate-btn');
-                const hasRequiredImages = (this.inputMode === 'separate' && this.fatherImages.length > 0 && this.motherImages.length > 0) || (this.inputMode === 'together' && this.togetherImages.length > 0);
+                const hasRequiredImages = (this.inputMode === 'separate' && this.fatherImages.length > 0 && this.motherImages.length > 0) ||
+                                        (this.inputMode === 'together' && this.togetherImages.length > 0) ||
+                                        (this.inputMode === 'ultrasound' && this.ultrasoundImages.length > 0);
                 const hasAgeProgression = this.generationMode !== 'ageProgression' || this.settings.selectedPresetAges.length > 0;
                 const isEnabled = hasRequiredImages && hasAgeProgression && !this.isLoading;
                 button.disabled = !isEnabled;
@@ -1175,8 +1264,10 @@
                 html += '<div><h4 style="margin: 0 0 0.5rem 0; color: var(--color-primary); font-size: 0.875rem; font-weight: 600;">📷 업로드된 사진</h4>';
                 if (this.inputMode === 'separate') {
                     html += `<p style="margin: 0; font-size: 0.875rem;">아빠 사진 ${this.fatherImages.length}장, 엄마 사진 ${this.motherImages.length}장</p>`;
-                } else {
+                } else if (this.inputMode === 'together') {
                     html += `<p style="margin: 0; font-size: 0.875rem;">부모님 함께 사진 ${this.togetherImages.length}장</p>`;
+                } else if (this.inputMode === 'ultrasound') {
+                    html += `<p style="margin: 0; font-size: 0.875rem;">초음파 사진 ${this.ultrasoundImages.length}장</p>`;
                 }
                 html += '</div>';
 
@@ -1237,7 +1328,9 @@
 
             showConfirmation() {
                 // 입력 검증
-                if ((this.inputMode === 'separate' && (this.fatherImages.length === 0 || this.motherImages.length === 0)) || (this.inputMode === 'together' && this.togetherImages.length === 0)) {
+                if ((this.inputMode === 'separate' && (this.fatherImages.length === 0 || this.motherImages.length === 0)) ||
+                    (this.inputMode === 'together' && this.togetherImages.length === 0) ||
+                    (this.inputMode === 'ultrasound' && this.ultrasoundImages.length === 0)) {
                     this.showError('각 카테고리에 최소 한 장의 사진을 업로드해주세요.');
                     return;
                 }
@@ -1284,7 +1377,12 @@
                 const { age, numberOfImages } = params;
                 const prompt = this.buildPrompt(age);
                 const parts = [];
-                if (this.inputMode === 'together' && this.togetherImages.length > 0) {
+                if (this.inputMode === 'ultrasound' && this.ultrasoundImages.length > 0) {
+                    this.ultrasoundImages.forEach(img => {
+                        parts.push({ inline_data: { data: img.imageData.base64, mime_type: img.imageData.mimeType } });
+                        parts.push({ text: 'This is a 3D/4D ultrasound image showing the baby in the womb.' });
+                    });
+                } else if (this.inputMode === 'together' && this.togetherImages.length > 0) {
                     this.togetherImages.forEach(img => {
                         parts.push({ inline_data: { data: img.imageData.base64, mime_type: img.imageData.mimeType } });
                         let ageText = "This photo shows father and mother together";
@@ -1402,6 +1500,44 @@
             }
             
             buildPrompt(age) {
+                if (this.inputMode === 'ultrasound') {
+                    // 초음파 모드용 특별한 프롬프트
+                    const nationality = this.settings.nationality || 'Korean';
+                    const gender = this.settings.gender === 'Male' ? 'male' : 'female';
+                    const ethnicity = this.settings.ethnicity || '';
+
+                    let prompt = `Analyze the uploaded ultrasound image as the primary reference for the baby's pose and angle. Generate a single, photorealistic, high-detail image of a healthy and adorable ${age} baby, perfectly matching the exact angle, orientation, and posture of the fetus in the ultrasound.
+
+BABY SPECIFICATIONS:
+- The baby should be of ${nationality} nationality
+- Gender: ${gender}
+- Age: ${age}`;
+
+                    if (ethnicity) {
+                        prompt += `\n- Ethnicity: ${ethnicity}`;
+                    }
+
+                    prompt += `
+
+VISUAL REQUIREMENTS:
+- The baby is dressed in a cozy, soft-knitted onesie in a delicate pastel color palette (light pinks, baby blues, and mint greens)
+- The lighting should be soft, warm, and natural, as if from a nearby window, creating a gentle and loving atmosphere
+- The background should be a clean, simple, and slightly out-of-focus nursery setting in complementary pastel tones
+- Capture this with the quality of a professional portrait photograph, using a shallow depth of field to emphasize the baby
+- The baby's skin should look soft and natural, with realistic textures
+- The overall mood should be peaceful, heartwarming, and full of tenderness
+
+CRITICAL POSITIONING:
+- Maintain the EXACT same angle, head position, and facial orientation as shown in the ultrasound
+- Transform the ultrasound features into a realistic baby appearance while preserving the identical pose
+- Keep the same facial structure and features visible in the ultrasound
+
+Generate only the image without any text descriptions, explanations, or confirmations. The result should be a professional-quality baby portrait that perfectly matches the ultrasound's angle and position.`;
+
+                    return prompt;
+                }
+
+                // 기존 부모 사진 기반 프롬프트
                 let prompt = `IMPORTANT: Generate only a photorealistic image. Do not provide text explanations or descriptions.
 
 Based on the provided parent photos, create a realistic child's face photo combining their facial features.
@@ -1460,35 +1596,93 @@ CRITICAL: Respond with only the generated image. Do not provide text description
                 document.getElementById('error-state').style.display = 'none';
                 document.getElementById('results-grid').style.display = 'grid';
                 const resultsGrid = document.getElementById('results-grid');
-                resultsGrid.className = `results-grid ${images.length === 1 ? 'single' : 'multiple'}`;
-                resultsGrid.innerHTML = '';
-                images.forEach((imageData, index) => {
-                    const resultItem = document.createElement('div');
-                    resultItem.className = 'result-item';
-                    const img = document.createElement('img');
-                    img.src = typeof imageData === 'string' ? imageData : imageData.src;
-                    img.alt = `생성된 아기 ${index + 1}`;
-                    img.className = 'result-image';
-                    const downloadBtn = document.createElement('button');
-                    downloadBtn.className = 'download-btn';
-                    let btnText = `<i class="fas fa-download" style="margin-right: 0.5rem;"></i>다운로드`;
-                    if (typeof imageData === 'object' && imageData.age) {
-                        const ageDisplay = imageData.age.replace(' old', '살').replace(' year', '살').replace(' months', '개월');
-                        btnText += ` (${ageDisplay})`;
-                    }
-                    downloadBtn.innerHTML = btnText;
-                    downloadBtn.onclick = () => this.downloadImage(img.src, index);
-                    resultItem.appendChild(img);
-                    resultItem.appendChild(downloadBtn);
-                    resultsGrid.appendChild(resultItem);
-                });
+
+                if (this.inputMode === 'ultrasound') {
+                    // 초음파 모드: 원본-결과 비교 뷰
+                    resultsGrid.className = 'results-grid single';
+                    resultsGrid.innerHTML = '';
+
+                    images.forEach((imageData, index) => {
+                        const comparisonContainer = document.createElement('div');
+                        comparisonContainer.className = 'ultrasound-comparison';
+
+                        // 원본 초음파 이미지
+                        const originalSection = document.createElement('div');
+                        originalSection.className = 'comparison-section';
+                        originalSection.innerHTML = `
+                            <div class="comparison-header">원본 초음파 사진</div>
+                            <img src="${this.ultrasoundImages[0].imageData.preview}" alt="원본 초음파" class="comparison-image">
+                            <div class="comparison-footer">
+                                <button class="download-btn" onclick="app.downloadImage('${this.ultrasoundImages[0].imageData.preview}', 'original')">
+                                    <i class="fas fa-download" style="margin-right: 0.5rem;"></i>원본 다운로드
+                                </button>
+                            </div>
+                        `;
+
+                        // 생성된 아기 이미지
+                        const generatedSection = document.createElement('div');
+                        generatedSection.className = 'comparison-section';
+                        const imgSrc = typeof imageData === 'string' ? imageData : imageData.src;
+                        let ageDisplay = '';
+                        if (typeof imageData === 'object' && imageData.age) {
+                            ageDisplay = imageData.age.replace(' old', '살').replace(' year', '살').replace(' months', '개월');
+                        }
+                        generatedSection.innerHTML = `
+                            <div class="comparison-header">예측된 아기 모습 ${ageDisplay ? `(${ageDisplay})` : ''}</div>
+                            <img src="${imgSrc}" alt="생성된 아기" class="comparison-image">
+                            <div class="comparison-footer">
+                                <button class="download-btn" onclick="app.downloadImage('${imgSrc}', ${index})">
+                                    <i class="fas fa-download" style="margin-right: 0.5rem;"></i>결과 다운로드 ${ageDisplay ? `(${ageDisplay})` : ''}
+                                </button>
+                            </div>
+                        `;
+
+                        comparisonContainer.appendChild(originalSection);
+                        comparisonContainer.appendChild(generatedSection);
+                        resultsGrid.appendChild(comparisonContainer);
+                    });
+                } else {
+                    // 기존 모드: 일반 그리드 뷰
+                    resultsGrid.className = `results-grid ${images.length === 1 ? 'single' : 'multiple'}`;
+                    resultsGrid.innerHTML = '';
+                    images.forEach((imageData, index) => {
+                        const resultItem = document.createElement('div');
+                        resultItem.className = 'result-item';
+                        const img = document.createElement('img');
+                        img.src = typeof imageData === 'string' ? imageData : imageData.src;
+                        img.alt = `생성된 아기 ${index + 1}`;
+                        img.className = 'result-image';
+                        const downloadBtn = document.createElement('button');
+                        downloadBtn.className = 'download-btn';
+                        let btnText = `<i class="fas fa-download" style="margin-right: 0.5rem;"></i>다운로드`;
+                        if (typeof imageData === 'object' && imageData.age) {
+                            const ageDisplay = imageData.age.replace(' old', '살').replace(' year', '살').replace(' months', '개월');
+                            btnText += ` (${ageDisplay})`;
+                        }
+                        downloadBtn.innerHTML = btnText;
+                        downloadBtn.onclick = () => this.downloadImage(img.src, index);
+                        resultItem.appendChild(img);
+                        resultItem.appendChild(downloadBtn);
+                        resultsGrid.appendChild(resultItem);
+                    });
+                }
             }
 
             downloadImage(imageDataUrl, index) {
                 const link = document.createElement('a');
                 link.href = imageDataUrl;
                 const fileExtension = imageDataUrl.split(';')[0].split('/')[1] || 'png';
-                link.download = `baby-prediction-${index + 1}.${fileExtension}`;
+
+                let filename;
+                if (index === 'original') {
+                    filename = `ultrasound-original.${fileExtension}`;
+                } else if (this.inputMode === 'ultrasound') {
+                    filename = `ultrasound-prediction-${index + 1}.${fileExtension}`;
+                } else {
+                    filename = `baby-prediction-${index + 1}.${fileExtension}`;
+                }
+
+                link.download = filename;
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
