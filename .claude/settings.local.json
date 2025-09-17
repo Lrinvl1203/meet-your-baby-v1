@@ -10,7 +10,14 @@
       "mcp__playwright__browser_snapshot",
       "mcp__playwright__browser_take_screenshot",
       "mcp__playwright__browser_type",
-      "mcp__playwright__browser_click"
+      "mcp__playwright__browser_click",
+      "Bash(git push:*)",
+      "mcp__sequential-thinking__sequentialthinking",
+      "WebFetch(domain:polar.sh)",
+      "Bash(python:*)",
+      "Bash(npx http-server:*)",
+      "mcp__playwright__browser_evaluate",
+      "mcp__playwright__browser_handle_dialog"
     ],
     "deny": [],
     "ask": []
