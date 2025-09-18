@@ -1845,6 +1845,45 @@
                 });
             }
 
+            updateCartDisplay() {
+                // 장바구니 배지 업데이트
+                const cartBadge = document.getElementById('cart-badge');
+                const cartFloatingBadge = document.getElementById('cart-floating-badge');
+                const cartCount = this.cartItems.length;
+
+                if (cartCount > 0) {
+                    if (cartBadge) {
+                        cartBadge.textContent = cartCount;
+                        cartBadge.style.display = 'block';
+                    }
+                    if (cartFloatingBadge) {
+                        cartFloatingBadge.textContent = cartCount;
+                        cartFloatingBadge.style.display = 'block';
+                    }
+
+                    // 플로팅 장바구니 버튼 표시
+                    const cartFloating = document.getElementById('cart-floating');
+                    if (cartFloating) {
+                        cartFloating.style.display = 'block';
+                    }
+                } else {
+                    if (cartBadge) cartBadge.style.display = 'none';
+                    if (cartFloatingBadge) cartFloatingBadge.style.display = 'none';
+
+                    // 플로팅 장바구니 버튼 숨김
+                    const cartFloating = document.getElementById('cart-floating');
+                    if (cartFloating) {
+                        cartFloating.style.display = 'none';
+                    }
+                }
+
+                // 장바구니 모달이 열려있다면 아이템 다시 렌더링
+                const cartModal = document.getElementById('cart-modal');
+                if (cartModal && cartModal.style.display === 'flex') {
+                    this.renderCartItems();
+                }
+            }
+
             async checkout() {
                 if (this.cartItems.length === 0) return;
 
