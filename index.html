@@ -1056,6 +1056,10 @@
                 <div style="margin-bottom: 1.5rem;">
                     <label style="display: block; font-size: 0.875rem; font-weight: 500; color: #4b5563; margin-bottom: 0.25rem;">비밀번호</label>
                     <input type="password" id="login-password" class="form-input" placeholder="비밀번호를 입력하세요" required>
+                    <div id="login-error" style="display: none; color: #dc3545; font-size: 0.75rem; margin-top: 0.25rem;"></div>
+                    <div style="text-align: right; margin-top: 0.5rem;">
+                        <button type="button" id="forgot-password-link" style="color: var(--color-primary); background: none; border: none; cursor: pointer; text-decoration: underline; font-size: 0.75rem;">비밀번호를 잊으셨나요?</button>
+                    </div>
                 </div>
 
                 <button type="submit" class="generate-button" style="width: 100%; margin-bottom: 1rem;">
@@ -1120,6 +1124,34 @@
 
                 <div style="text-align: center; font-size: 0.875rem; color: var(--color-text-secondary);">
                     이미 계정이 있으신가요? <button type="button" id="switch-to-login" style="color: var(--color-primary); background: none; border: none; cursor: pointer; text-decoration: underline;">로그인</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Forgot Password Modal -->
+    <div id="forgot-password-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <button id="close-forgot-password" class="modal-close">&times;</button>
+            <div style="text-align: center; margin-bottom: 2rem;">
+                <i class="fas fa-key" style="color: var(--color-primary); font-size: 2.5rem; margin-bottom: 1rem;"></i>
+                <h2 style="margin: 0; font-size: 1.5rem; font-weight: 700;">비밀번호 찾기</h2>
+                <p style="color: var(--color-text-secondary); margin-top: 0.5rem;">가입 시 사용한 이메일을 입력하세요</p>
+            </div>
+
+            <form id="forgot-password-form">
+                <div style="margin-bottom: 1.5rem;">
+                    <label style="display: block; font-size: 0.875rem; font-weight: 500; color: #4b5563; margin-bottom: 0.25rem;">이메일</label>
+                    <input type="email" id="forgot-email" class="form-input" placeholder="가입 시 사용한 이메일을 입력하세요" required>
+                    <div id="forgot-error" style="display: none; color: #dc3545; font-size: 0.75rem; margin-top: 0.25rem;"></div>
+                </div>
+
+                <button type="submit" class="generate-button" style="width: 100%; margin-bottom: 1rem;">
+                    <i class="fas fa-paper-plane" style="margin-right: 0.5rem;"></i>비밀번호 재설정 이메일 전송
+                </button>
+
+                <div style="text-align: center; font-size: 0.875rem; color: var(--color-text-secondary);">
+                    기억났나요? <button type="button" id="back-to-login" style="color: var(--color-primary); background: none; border: none; cursor: pointer; text-decoration: underline;">로그인</button>
                 </div>
             </form>
         </div>
@@ -1565,8 +1597,11 @@
                 const email = document.getElementById('login-email').value.trim();
                 const password = document.getElementById('login-password').value;
 
+                // 이전 오류 메시지 숨기기
+                this.hideLoginError();
+
                 if (!email || !password) {
-                    this.showError('이메일과 비밀번호를 입력해주세요.');
+                    this.showLoginError('이메일과 비밀번호를 입력해주세요.');
                     return;
                 }
 
@@ -1576,13 +1611,27 @@
                         password
                     });
 
-                    if (error) throw error;
+                    if (error) {
+                        // Supabase Auth 에러 메시지 처리
+                        if (error.message.includes('Invalid login credentials')) {
+                            this.showLoginError('이메일 또는 비밀번호가 올바르지 않습니다.');
+                        } else if (error.message.includes('Email not confirmed')) {
+                            this.showLoginError('이메일 인증이 필요합니다. 이메일을 확인해주세요.');
+                        } else if (error.message.includes('Invalid email')) {
+                            this.showLoginError('올바른 이메일 주소를 입력해주세요.');
+                        } else {
+                            this.showLoginError(error.message || '로그인에 실패했습니다.');
+                        }
+                        return;
+                    }
 
+                    console.log('✅ 로그인 성공:', data);
                     this.hideLoginModal();
                     this.showSuccess('로그인되었습니다!');
+
                 } catch (error) {
                     console.error('Login error:', error);
-                    this.showError(error.message || '로그인에 실패했습니다.');
+                    this.showLoginError(error.message || '로그인에 실패했습니다.');
                 }
             }
 
@@ -1610,6 +1659,26 @@
                 }
 
                 try {
+                    // 1. 먼저 이메일 중복 확인
+                    console.log('📧 이메일 중복 확인 중:', email);
+
+                    const { data: existingUsers, error: checkError } = await this.supabase
+                        .from('profiles')
+                        .select('email')
+                        .eq('email', email)
+                        .limit(1);
+
+                    if (checkError) {
+                        console.log('⚠️ 프로필 테이블에서 확인 실패, auth 테이블 확인');
+                        // profiles 테이블이 없거나 오류 시 auth 테이블에서 확인 시도는 불가하므로 계속 진행
+                    } else if (existingUsers && existingUsers.length > 0) {
+                        this.showError('이미 가입된 이메일입니다. 로그인을 시도해주세요.');
+                        return;
+                    }
+
+                    // 2. 중복이 없으면 회원가입 진행
+                    console.log('✅ 이메일 중복 없음, 회원가입 진행');
+
                     const { data, error } = await this.supabase.auth.signUp({
                         email,
                         password,
@@ -1620,13 +1689,31 @@
                         }
                     });
 
-                    if (error) throw error;
+                    if (error) {
+                        // Supabase Auth 에러 메시지 처리
+                        if (error.message.includes('User already registered')) {
+                            this.showError('이미 가입된 이메일입니다. 로그인을 시도해주세요.');
+                        } else if (error.message.includes('Invalid email')) {
+                            this.showError('올바른 이메일 주소를 입력해주세요.');
+                        } else if (error.message.includes('Password should be at least')) {
+                            this.showError('비밀번호는 최소 6자 이상이어야 합니다.');
+                        } else {
+                            this.showError(error.message || '회원가입에 실패했습니다.');
+                        }
+                        return;
+                    }
 
+                    console.log('✅ 회원가입 성공:', data);
                     this.hideSignupModal();
                     this.showSuccess('회원가입이 완료되었습니다! 이메일을 확인해주세요.');
+
                 } catch (error) {
                     console.error('Signup error:', error);
-                    this.showError(error.message || '회원가입에 실패했습니다.');
+                    if (error.message.includes('already')) {
+                        this.showError('이미 가입된 이메일입니다. 로그인을 시도해주세요.');
+                    } else {
+                        this.showError(error.message || '회원가입에 실패했습니다.');
+                    }
                 }
             }
 
@@ -2847,11 +2934,24 @@
                     if (e.target.id === 'result-modal') this.closeModal();
                 });
 
+                // 비밀번호 찾기 관련 이벤트
+                document.getElementById('forgot-password-link').addEventListener('click', () => this.showForgotPasswordModal());
+                document.getElementById('close-forgot-password').addEventListener('click', () => this.hideForgotPasswordModal());
+                document.getElementById('back-to-login').addEventListener('click', () => this.backToLogin());
+                document.getElementById('forgot-password-form').addEventListener('submit', (e) => this.handleForgotPassword(e));
+
+                // 모달 외부 클릭으로 닫기
+                document.getElementById('forgot-password-modal').addEventListener('click', (e) => {
+                    if (e.target.id === 'forgot-password-modal') this.hideForgotPasswordModal();
+                });
+
                 // 키보드 단축키
                 document.addEventListener('keydown', (e) => {
                     if (e.key === 'Escape') {
                         if (document.getElementById('confirmation-modal').style.display === 'flex') {
                             this.closeConfirmationModal();
+                        } else if (document.getElementById('forgot-password-modal').style.display === 'flex') {
+                            this.hideForgotPasswordModal();
                         } else {
                             this.closeModal();
                         }
@@ -3362,6 +3462,16 @@
             async generateImagesOnly() {
                 this.isLoading = true;
                 this.updateGenerateButton();
+
+                // API 키 확인 및 재로드
+                if (!this.apiKey) {
+                    console.log('🔑 API 키 재로드 중...');
+                    this.apiKey = await this.getSecureApiKey();
+                }
+
+                if (!this.apiKey) {
+                    throw new Error('API 키를 찾을 수 없습니다. 관리자에게 문의하세요.');
+                }
 
                 try {
                     let generatedImages = [];
@@ -3988,6 +4098,97 @@ CRITICAL: Respond with only the generated image. Do not provide text description
             updateUI() {
                 this.updateGenerateButton();
                 document.querySelector('input[name="gender"][value="Female"]').checked = true;
+            }
+
+            // 로그인 오류 메시지 표시/숨기기
+            showLoginError(message) {
+                const errorDiv = document.getElementById('login-error');
+                if (errorDiv) {
+                    errorDiv.textContent = message;
+                    errorDiv.style.display = 'block';
+                }
+            }
+
+            hideLoginError() {
+                const errorDiv = document.getElementById('login-error');
+                if (errorDiv) {
+                    errorDiv.style.display = 'none';
+                }
+            }
+
+            // 비밀번호 찾기 모달 표시/숨기기
+            showForgotPasswordModal() {
+                this.hideLoginModal();
+                document.getElementById('forgot-password-modal').style.display = 'flex';
+                document.body.style.overflow = 'hidden';
+            }
+
+            hideForgotPasswordModal() {
+                document.getElementById('forgot-password-modal').style.display = 'none';
+                document.body.style.overflow = 'auto';
+                this.hideForgotError();
+            }
+
+            backToLogin() {
+                this.hideForgotPasswordModal();
+                this.showLoginModal();
+            }
+
+            // 비밀번호 찾기 오류 메시지 표시/숨기기
+            showForgotError(message) {
+                const errorDiv = document.getElementById('forgot-error');
+                if (errorDiv) {
+                    errorDiv.textContent = message;
+                    errorDiv.style.display = 'block';
+                }
+            }
+
+            hideForgotError() {
+                const errorDiv = document.getElementById('forgot-error');
+                if (errorDiv) {
+                    errorDiv.style.display = 'none';
+                }
+            }
+
+            // 비밀번호 찾기 처리
+            async handleForgotPassword(e) {
+                e.preventDefault();
+                const email = document.getElementById('forgot-email').value.trim();
+
+                // 이전 오류 메시지 숨기기
+                this.hideForgotError();
+
+                if (!email) {
+                    this.showForgotError('이메일을 입력해주세요.');
+                    return;
+                }
+
+                try {
+                    console.log('📧 비밀번호 재설정 이메일 전송 중:', email);
+
+                    const { data, error } = await this.supabase.auth.resetPasswordForEmail(email, {
+                        redirectTo: `${window.location.origin}?reset-password=true`
+                    });
+
+                    if (error) {
+                        if (error.message.includes('Email not confirmed')) {
+                            this.showForgotError('이메일 인증이 되지 않은 계정입니다.');
+                        } else if (error.message.includes('Invalid email')) {
+                            this.showForgotError('올바른 이메일 주소를 입력해주세요.');
+                        } else {
+                            this.showForgotError(error.message || '비밀번호 재설정 이메일 전송에 실패했습니다.');
+                        }
+                        return;
+                    }
+
+                    console.log('✅ 비밀번호 재설정 이메일 전송 성공');
+                    this.hideForgotPasswordModal();
+                    this.showSuccess('비밀번호 재설정 이메일을 전송했습니다. 이메일을 확인해주세요.');
+
+                } catch (error) {
+                    console.error('Forgot password error:', error);
+                    this.showForgotError(error.message || '비밀번호 재설정 이메일 전송에 실패했습니다.');
+                }
             }
         }
 
