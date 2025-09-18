@@ -2068,18 +2068,21 @@
                 const urlParams = new URLSearchParams(window.location.search);
                 const paymentStatus = urlParams.get('payment');
                 const orderId = urlParams.get('order');
+                const paymentType = urlParams.get('type'); // 'direct' 또는 없음 (장바구니)
 
                 if (paymentStatus && orderId) {
                     if (paymentStatus === 'success') {
-                        this.handlePaymentSuccess(orderId);
+                        this.handlePaymentSuccess(orderId, paymentType);
                     } else if (paymentStatus === 'cancel') {
                         this.handlePaymentCancel(orderId);
                     }
                 }
             }
 
-            async handlePaymentSuccess(orderId) {
+            async handlePaymentSuccess(orderId, paymentType) {
                 try {
+                    console.log('💳 결제 완료 확인됨, 주문 ID:', orderId, '결제 타입:', paymentType);
+
                     // 주문 상태를 완료로 업데이트
                     await this.supabase
                         .from('orders')
@@ -2089,56 +2092,143 @@
                         })
                         .eq('id', orderId);
 
-                    // 장바구니 비우기
-                    await this.supabase
-                        .from('cart_items')
-                        .delete()
-                        .eq('user_id', this.currentUser.id);
+                    if (paymentType === 'direct') {
+                        // 즉시 결제 타입: sessionStorage에서 설정 복원
+                        console.log('🔄 즉시 결제 - 설정 복원 중...');
 
-                    // 주문 정보 가져오기
-                    const { data: orderItems, error: orderItemsError } = await this.supabase
-                        .from('order_items')
-                        .select(`
-                            *,
-                            generated_images (*)
-                        `)
-                        .eq('order_id', orderId);
+                        const pendingData = sessionStorage.getItem('pendingGeneration');
+                        if (pendingData) {
+                            const { settings } = JSON.parse(pendingData);
 
-                    if (orderItemsError) throw orderItemsError;
+                            try {
+                                // 생성 설정 복원
+                                this.restoreGenerationSettings(settings);
 
-                    // 각 주문 항목을 처리 대기열에 추가
-                    for (const orderItem of orderItems) {
-                        const generationParams = {
-                            image_type: orderItem.generated_images.image_type,
-                            generation_settings: orderItem.generated_images.generation_settings,
-                            original_image_url: orderItem.generated_images.image_url
-                        };
+                                // 실제 이미지 생성 API 호출
+                                const generatedImages = await this.generateImagesOnly();
 
-                        // 처리 대기열에 추가
+                                console.log('✅ 즉시 결제 - 이미지 생성 완료:', generatedImages);
+
+                                // 생성된 이미지를 처리 대기열에 추가
+                                await this.supabase
+                                    .rpc('add_to_processing_queue', {
+                                        user_uuid: this.currentUser.id,
+                                        order_uuid: orderId,
+                                        gen_type: settings.inputMode,
+                                        gen_params: {
+                                            settings: settings,
+                                            generated_images: generatedImages,
+                                            generated_at: new Date().toISOString()
+                                        },
+                                        priority_level: 1 // 즉시 결제는 높은 우선순위
+                                    });
+
+                                // 임시 저장 데이터 삭제
+                                sessionStorage.removeItem('pendingGeneration');
+
+                            } catch (imageGenError) {
+                                console.error('즉시 결제 - 이미지 생성 오류:', imageGenError);
+
+                                // 이미지 생성 실패 시에도 대기열에 오류 상태로 추가
+                                await this.supabase
+                                    .rpc('add_to_processing_queue', {
+                                        user_uuid: this.currentUser.id,
+                                        order_uuid: orderId,
+                                        gen_type: settings.inputMode,
+                                        gen_params: {
+                                            settings: settings,
+                                            error: imageGenError.message,
+                                            failed_at: new Date().toISOString()
+                                        },
+                                        priority_level: 1
+                                    });
+                            }
+                        }
+
+                    } else {
+                        // 장바구니 결제 타입: 장바구니에서 항목 가져오기
+                        console.log('🛒 장바구니 결제 - 항목 처리 중...');
+
+                        // 주문에 연결된 장바구니 항목 정보 가져오기
+                        const { data: cartItems, error: cartError } = await this.supabase
+                            .from('cart_items')
+                            .select('*')
+                            .eq('user_id', this.currentUser.id);
+
+                        if (cartError) throw cartError;
+
+                        console.log('🛒 결제 완료된 장바구니 항목들:', cartItems);
+
+                        // 각 장바구니 항목에 대해 이미지 생성 API 호출
+                        for (const cartItem of cartItems) {
+                            try {
+                                console.log('🎨 이미지 생성 시작:', cartItem);
+
+                                // 장바구니 항목의 설정을 기반으로 이미지 생성
+                                const itemData = cartItem.item_data;
+
+                                // 생성 설정 복원
+                                this.restoreGenerationSettings(itemData.settings);
+
+                                // 실제 이미지 생성 API 호출
+                                const generatedImages = await this.generateImagesOnly();
+
+                                console.log('✅ 이미지 생성 완료:', generatedImages);
+
+                                // 생성된 이미지를 처리 대기열에 추가
+                                await this.supabase
+                                    .rpc('add_to_processing_queue', {
+                                        user_uuid: this.currentUser.id,
+                                        order_uuid: orderId,
+                                        gen_type: itemData.type,
+                                        gen_params: {
+                                            settings: itemData.settings,
+                                            generated_images: generatedImages,
+                                            generated_at: new Date().toISOString()
+                                        },
+                                        priority_level: 0
+                                    });
+
+                                console.log('📋 처리 대기열에 추가 완료');
+
+                            } catch (imageGenError) {
+                                console.error('이미지 생성 오류:', imageGenError);
+
+                                // 이미지 생성 실패 시에도 대기열에 오류 상태로 추가
+                                await this.supabase
+                                    .rpc('add_to_processing_queue', {
+                                        user_uuid: this.currentUser.id,
+                                        order_uuid: orderId,
+                                        gen_type: cartItem.item_data.type,
+                                        gen_params: {
+                                            settings: cartItem.item_data.settings,
+                                            error: imageGenError.message,
+                                            failed_at: new Date().toISOString()
+                                        },
+                                        priority_level: 0
+                                    });
+                            }
+                        }
+
+                        // 장바구니 비우기
                         await this.supabase
-                            .rpc('add_to_processing_queue', {
-                                user_uuid: this.currentUser.id,
-                                order_uuid: orderId,
-                                gen_type: orderItem.generated_images.image_type,
-                                gen_params: generationParams,
-                                priority_level: 0
-                            });
+                            .from('cart_items')
+                            .delete()
+                            .eq('user_id', this.currentUser.id);
                     }
 
-                    // 관련 이미지들을 구매완료 상태로 업데이트
-                    await this.supabase
-                        .from('generated_images')
-                        .update({ is_purchased: true })
-                        .in('id', orderItems.map(item => item.image_id));
-
-                    this.showSuccess('결제가 완료되었습니다! 처리 현황에서 아기 얼굴 생성 진행상황을 확인할 수 있습니다.');
+                    this.showSuccess('결제가 완료되고 이미지 생성이 시작되었습니다! 처리 현황에서 진행상황을 확인할 수 있습니다.');
                     this.loadCartItems();
+
+                    // 처리 현황 모달 표시
+                    this.showProcessingQueueModal();
 
                     // URL 파라미터 정리
                     window.history.replaceState(null, '', window.location.pathname);
+
                 } catch (error) {
                     console.error('Payment success handling error:', error);
-                    this.showError('결제 완료 처리 중 오류가 발생했습니다.');
+                    this.showError('결제 완료 처리 중 오류가 발생했습니다: ' + error.message);
                 }
             }
 
@@ -3199,19 +3289,34 @@
                 try {
                     this.closeConfirmationModal();
 
-                    // 이미지 생성
-                    const generatedImages = await this.generateImagesOnly();
+                    // 1. 먼저 결제 정보 생성
+                    const imagePrice = 500; // 500원
+                    const totalImages = this.calculateTotalImages();
+                    const totalAmount = totalImages * imagePrice;
 
-                    // 생성된 이미지들을 즉시 결제 처리
-                    for (const [index, imageData] of generatedImages.entries()) {
-                        await this.buyNow(index, imageData);
+                    // 2. 즉시 결제 처리
+                    const paymentResult = await this.processDirectPayment(totalAmount, totalImages);
+
+                    if (!paymentResult.success) {
+                        throw new Error('결제에 실패했습니다.');
                     }
 
-                    this.showSuccess('이미지가 생성되고 결제가 진행되었습니다!');
+                    console.log('✅ 결제 완료 확인:', paymentResult);
+
+                    // 3. 결제 완료 후 이미지 생성 API 호출
+                    const generatedImages = await this.generateImagesOnly();
+
+                    // 4. 생성된 이미지를 처리 대기열에 추가
+                    await this.addToProcessingQueue(paymentResult.orderId, generatedImages);
+
+                    this.showSuccess('결제가 완료되었습니다! 이미지 생성이 시작되었습니다.');
+
+                    // 5. 처리 현황 모달 표시
+                    this.showProcessingQueueModal();
 
                 } catch (error) {
                     console.error('즉시 결제 및 생성 오류:', error);
-                    this.showError('즉시 결제 및 생성에 실패했습니다.');
+                    this.showError(error.message || '즉시 결제 및 생성에 실패했습니다.');
                 }
             }
 
@@ -3225,15 +3330,27 @@
                 try {
                     this.closeConfirmationModal();
 
-                    // 이미지 생성
-                    const generatedImages = await this.generateImagesOnly();
+                    // 1. 장바구니에 항목 추가 (이미지 생성 전)
+                    const imagePrice = 500; // 500원
+                    const totalImages = this.calculateTotalImages();
 
-                    // 생성된 이미지들을 장바구니에 추가
-                    for (const [index, imageData] of generatedImages.entries()) {
-                        await this.addToCart(index, imageData);
-                    }
+                    // 현재 설정을 기반으로 장바구니 항목 생성
+                    const cartItem = {
+                        type: this.inputMode,
+                        settings: this.getCurrentGenerationSettings(),
+                        price: imagePrice,
+                        quantity: totalImages,
+                        total: totalImages * imagePrice,
+                        timestamp: Date.now()
+                    };
 
-                    this.showSuccess('이미지가 생성되고 장바구니에 추가되었습니다!');
+                    // 장바구니에 추가
+                    await this.addItemToCart(cartItem);
+
+                    this.showSuccess('장바구니에 추가되었습니다!');
+
+                    // 2. 장바구니 모달 표시
+                    this.showCartModal();
 
                 } catch (error) {
                     console.error('장바구니 추가 오류:', error);
@@ -3266,6 +3383,210 @@
                     this.isLoading = false;
                     this.updateGenerateButton();
                 }
+            }
+
+            // 총 이미지 수 계산
+            calculateTotalImages() {
+                if (this.generationMode === 'singleAge') {
+                    return this.settings.numberOfImages;
+                } else {
+                    return this.settings.selectedPresetAges.length * this.settings.ageProgressionCount;
+                }
+            }
+
+            // 현재 생성 설정을 가져오는 함수
+            getCurrentGenerationSettings() {
+                return {
+                    inputMode: this.inputMode,
+                    generationMode: this.generationMode,
+                    babyAge: this.settings.babyAge,
+                    customAge: this.settings.customAge,
+                    numberOfImages: this.settings.numberOfImages,
+                    selectedPresetAges: this.settings.selectedPresetAges,
+                    ageProgressionCount: this.settings.ageProgressionCount,
+                    comparisonType: this.comparisonType,
+                    simplePercentages: this.settings.simplePercentages,
+                    detailedPercentages: this.settings.detailedPercentages
+                };
+            }
+
+            // 즉시 결제 처리
+            async processDirectPayment(totalAmount, imageCount) {
+                try {
+                    console.log(`💳 즉시 결제 처리 시작: ${totalAmount}원 (${imageCount}장)`);
+
+                    // 1. 먼저 주문 생성
+                    const { data: order, error: orderError } = await this.supabase
+                        .rpc('create_order_from_cart', {
+                            user_uuid: this.currentUser.id
+                        });
+
+                    if (orderError) {
+                        // 장바구니가 비어있다면 즉시 주문 생성
+                        const { data: newOrder, error: newOrderError } = await this.supabase
+                            .from('orders')
+                            .insert([{
+                                user_id: this.currentUser.id,
+                                order_number: `MYB-${Date.now()}`,
+                                total_amount_cents: totalAmount,
+                                status: 'pending'
+                            }])
+                            .select()
+                            .single();
+
+                        if (newOrderError) throw newOrderError;
+                        var orderId = newOrder.id;
+                    } else {
+                        var orderId = order;
+                    }
+
+                    console.log('📋 주문 생성됨:', orderId);
+
+                    // 2. 현재 생성 설정을 임시 저장 (결제 완료 후 복원용)
+                    const generationSettings = this.getCurrentGenerationSettings();
+                    sessionStorage.setItem('pendingGeneration', JSON.stringify({
+                        orderId: orderId,
+                        settings: generationSettings,
+                        timestamp: Date.now()
+                    }));
+
+                    // 3. Polar Payment API를 통한 즉시 결제
+                    const orderData = {
+                        product: {
+                            name: `AI 아기 얼굴 예측 - ${imageCount}장`,
+                            price: totalAmount
+                        },
+                        success_url: `${window.location.origin}?payment=success&order=${orderId}&type=direct`,
+                        cancel_url: `${window.location.origin}?payment=cancel&order=${orderId}`,
+                        currency: 'KRW'
+                    };
+
+                    const checkoutResponse = await this.createPolarCheckout(orderData);
+
+                    if (!checkoutResponse.success) {
+                        throw new Error('결제 세션 생성에 실패했습니다.');
+                    }
+
+                    // 4. 결제 페이지로 리다이렉트
+                    window.location.href = checkoutResponse.checkout_url;
+
+                    return {
+                        success: true,
+                        orderId: orderId,
+                        checkoutUrl: checkoutResponse.checkout_url
+                    };
+
+                } catch (error) {
+                    console.error('즉시 결제 처리 오류:', error);
+                    return {
+                        success: false,
+                        error: error.message
+                    };
+                }
+            }
+
+            // 장바구니에 항목 추가
+            async addItemToCart(cartItem) {
+                try {
+                    const { data, error } = await this.supabase
+                        .from('cart_items')
+                        .insert([{
+                            user_id: this.currentUser.id,
+                            item_data: cartItem,
+                            price_cents: cartItem.total,
+                            quantity: cartItem.quantity
+                        }]);
+
+                    if (error) throw error;
+
+                    // 로컬 장바구니도 업데이트
+                    this.cartItems.push(cartItem);
+                    this.updateCartDisplay();
+
+                    console.log('✅ 장바구니에 추가됨:', cartItem);
+
+                } catch (error) {
+                    console.error('장바구니 추가 오류:', error);
+                    throw error;
+                }
+            }
+
+            // 처리 대기열에 추가
+            async addToProcessingQueue(orderId, generatedImages) {
+                try {
+                    const queueData = {
+                        user_id: this.currentUser.id,
+                        order_id: orderId,
+                        generation_type: this.inputMode,
+                        generation_params: this.getCurrentGenerationSettings(),
+                        result_data: {
+                            images: generatedImages,
+                            generated_at: new Date().toISOString()
+                        }
+                    };
+
+                    const { data, error } = await this.supabase
+                        .rpc('add_to_processing_queue', {
+                            user_uuid: this.currentUser.id,
+                            order_uuid: orderId,
+                            gen_type: this.inputMode,
+                            gen_params: queueData.generation_params
+                        });
+
+                    if (error) throw error;
+
+                    console.log('✅ 처리 대기열에 추가됨:', data);
+                    return data;
+
+                } catch (error) {
+                    console.error('처리 대기열 추가 오류:', error);
+                    throw error;
+                }
+            }
+
+            // 생성 설정 복원 함수
+            restoreGenerationSettings(settings) {
+                try {
+                    console.log('🔄 생성 설정 복원:', settings);
+
+                    // 기본 설정 복원
+                    this.inputMode = settings.inputMode;
+                    this.generationMode = settings.generationMode;
+                    this.comparisonType = settings.comparisonType;
+
+                    // 세부 설정 복원
+                    this.settings = {
+                        ...this.settings,
+                        babyAge: settings.babyAge,
+                        customAge: settings.customAge,
+                        numberOfImages: settings.numberOfImages,
+                        selectedPresetAges: settings.selectedPresetAges || [],
+                        ageProgressionCount: settings.ageProgressionCount,
+                        simplePercentages: settings.simplePercentages || { mom: 50, dad: 50 },
+                        detailedPercentages: settings.detailedPercentages || {}
+                    };
+
+                    console.log('✅ 설정 복원 완료');
+                } catch (error) {
+                    console.error('설정 복원 오류:', error);
+                    // 기본값으로 설정
+                    this.setDefaultSettings();
+                }
+            }
+
+            // 기본 설정으로 초기화
+            setDefaultSettings() {
+                this.inputMode = 'separate';
+                this.generationMode = 'singleAge';
+                this.comparisonType = 'simple';
+                this.settings = {
+                    babyAge: 'Newborn',
+                    numberOfImages: 1,
+                    selectedPresetAges: [],
+                    ageProgressionCount: 1,
+                    simplePercentages: { mom: 50, dad: 50 },
+                    detailedPercentages: {}
+                };
             }
 
             async callGeminiAPI(params) {
