@@ -631,6 +631,10 @@
             background: #a78bfa;
             color: #5b21b6;
         }
+        .status-cancelled {
+            background: #6b7280;
+            color: #374151;
+        }
 
         .price-tag {
             font-size: 0.875rem;
@@ -694,6 +698,7 @@
                     <button id="cart-btn" class="auth-btn">
                         <i class="fas fa-shopping-cart"></i> 장바구니 (<span id="cart-count">0</span>)
                     </button>
+                    <button id="queue-btn" class="auth-btn">처리 현황</button>
                     <button id="orders-btn" class="auth-btn">구매 이력</button>
                     <button id="logout-btn" class="auth-btn">로그아웃</button>
                 </div>
@@ -1172,6 +1177,22 @@
 
             <div id="orders-list" style="max-height: 500px; overflow-y: auto;">
                 <!-- Orders will be inserted here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Processing Queue Modal -->
+    <div id="queue-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <button id="close-queue" class="modal-close">&times;</button>
+            <div style="text-align: center; margin-bottom: 2rem;">
+                <i class="fas fa-tasks" style="color: var(--color-primary); font-size: 2.5rem; margin-bottom: 1rem;"></i>
+                <h2 style="margin: 0; font-size: 1.5rem; font-weight: 700;">처리 대기열</h2>
+                <p style="color: var(--color-text-secondary); margin-top: 0.5rem;">아기 얼굴 생성 진행상황을 확인하세요</p>
+            </div>
+
+            <div id="queue-list" style="max-height: 500px; overflow-y: auto;">
+                <!-- Queue items will be inserted here -->
             </div>
         </div>
     </div>
@@ -1924,13 +1945,43 @@
                         .delete()
                         .eq('user_id', this.currentUser.id);
 
+                    // 주문 정보 가져오기
+                    const { data: orderItems, error: orderItemsError } = await this.supabase
+                        .from('order_items')
+                        .select(`
+                            *,
+                            generated_images (*)
+                        `)
+                        .eq('order_id', orderId);
+
+                    if (orderItemsError) throw orderItemsError;
+
+                    // 각 주문 항목을 처리 대기열에 추가
+                    for (const orderItem of orderItems) {
+                        const generationParams = {
+                            image_type: orderItem.generated_images.image_type,
+                            generation_settings: orderItem.generated_images.generation_settings,
+                            original_image_url: orderItem.generated_images.image_url
+                        };
+
+                        // 처리 대기열에 추가
+                        await this.supabase
+                            .rpc('add_to_processing_queue', {
+                                user_uuid: this.currentUser.id,
+                                order_uuid: orderId,
+                                gen_type: orderItem.generated_images.image_type,
+                                gen_params: generationParams,
+                                priority_level: 0
+                            });
+                    }
+
                     // 관련 이미지들을 구매완료 상태로 업데이트
                     await this.supabase
                         .from('generated_images')
                         .update({ is_purchased: true })
-                        .in('id', this.cartItems.map(item => item.image_id));
+                        .in('id', orderItems.map(item => item.image_id));
 
-                    this.showSuccess('결제가 완료되었습니다! 구매한 이미지를 다운로드할 수 있습니다.');
+                    this.showSuccess('결제가 완료되었습니다! 처리 현황에서 아기 얼굴 생성 진행상황을 확인할 수 있습니다.');
                     this.loadCartItems();
 
                     // URL 파라미터 정리
@@ -2157,6 +2208,298 @@
                 }
             }
 
+            // Processing Queue Modal Functions
+            showQueueModal() {
+                document.getElementById('queue-modal').style.display = 'flex';
+                document.body.style.overflow = 'hidden';
+                this.loadProcessingQueue();
+            }
+
+            hideQueueModal() {
+                document.getElementById('queue-modal').style.display = 'none';
+                document.body.style.overflow = 'auto';
+            }
+
+            async loadProcessingQueue() {
+                if (!this.isAuthenticated) return;
+
+                try {
+                    const { data: queueItems, error } = await this.supabase
+                        .rpc('get_user_queue_status', { user_uuid: this.currentUser.id });
+
+                    if (error) throw error;
+
+                    this.renderProcessingQueue(queueItems);
+                } catch (error) {
+                    console.error('대기열 로드 오류:', error);
+                    this.showError('대기열 정보를 불러오는데 실패했습니다.');
+                }
+            }
+
+            renderProcessingQueue(queueItems) {
+                const container = document.getElementById('queue-list');
+                container.innerHTML = '';
+
+                if (!queueItems || queueItems.length === 0) {
+                    container.innerHTML = `
+                        <div style="text-align: center; padding: 2rem; color: var(--color-text-secondary);">
+                            <i class="fas fa-tasks" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.3;"></i>
+                            <p>처리 중인 작업이 없습니다</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                queueItems.forEach(item => {
+                    const queueDiv = document.createElement('div');
+                    queueDiv.style.cssText = 'border-bottom: 1px solid var(--color-border); padding: 1.5rem 0;';
+
+                    const createdDate = new Date(item.created_at).toLocaleDateString('ko-KR');
+                    const statusClass = this.getQueueStatusClass(item.status);
+                    const statusText = this.getQueueStatusText(item.status);
+
+                    queueDiv.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
+                            <div>
+                                <div style="font-weight: 600; margin-bottom: 0.25rem;">
+                                    ${this.getImageTypeLabel(item.generation_type)} 이미지 생성
+                                </div>
+                                <div style="font-size: 0.875rem; color: var(--color-text-secondary);">
+                                    요청일: ${createdDate}
+                                </div>
+                            </div>
+                            <span class="status-badge ${statusClass}">${statusText}</span>
+                        </div>
+                        <div class="progress-section" style="margin-bottom: 1rem;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                <span style="font-size: 0.875rem; font-weight: 600;">진행률</span>
+                                <span style="font-size: 0.875rem; color: var(--color-secondary);">${item.progress_percentage}%</span>
+                            </div>
+                            <div style="background: var(--color-background-secondary); border-radius: 0.5rem; height: 8px; overflow: hidden;">
+                                <div style="background: var(--color-secondary); height: 100%; width: ${item.progress_percentage}%; transition: width 0.3s ease;"></div>
+                            </div>
+                        </div>
+                        ${item.status === 'completed' ? this.renderCompletedActions(item) : ''}
+                        ${item.estimated_completion_time ? `
+                            <div style="font-size: 0.875rem; color: var(--color-text-secondary);">
+                                예상 완료: ${new Date(item.estimated_completion_time).toLocaleTimeString('ko-KR')}
+                            </div>
+                        ` : ''}
+                    `;
+
+                    container.appendChild(queueDiv);
+                });
+            }
+
+            renderCompletedActions(item) {
+                return `
+                    <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                        <button onclick="app.downloadProcessedImage('${item.queue_id}')"
+                                style="background: var(--color-secondary); color: white; border: none;
+                                       border-radius: 0.25rem; padding: 0.5rem 1rem; cursor: pointer;
+                                       font-size: 0.875rem;">
+                            <i class="fas fa-download" style="margin-right: 0.25rem;"></i>다운로드
+                        </button>
+                        <button onclick="app.viewProcessedImage('${item.queue_id}')"
+                                style="background: var(--color-primary); color: white; border: none;
+                                       border-radius: 0.25rem; padding: 0.5rem 1rem; cursor: pointer;
+                                       font-size: 0.875rem;">
+                            <i class="fas fa-eye" style="margin-right: 0.25rem;"></i>미리보기
+                        </button>
+                    </div>
+                `;
+            }
+
+            getQueueStatusClass(status) {
+                const classes = {
+                    queued: 'status-pending',
+                    processing: 'status-processing',
+                    completed: 'status-completed',
+                    failed: 'status-failed',
+                    cancelled: 'status-cancelled'
+                };
+                return classes[status] || 'status-pending';
+            }
+
+            getQueueStatusText(status) {
+                const texts = {
+                    queued: '대기 중',
+                    processing: '처리 중',
+                    completed: '완료',
+                    failed: '실패',
+                    cancelled: '취소됨'
+                };
+                return texts[status] || status;
+            }
+
+            async downloadProcessedImage(queueId) {
+                try {
+                    // Get queue item with result data
+                    const { data: queueItem, error } = await this.supabase
+                        .from('processing_queue')
+                        .select('result_data')
+                        .eq('id', queueId)
+                        .single();
+
+                    if (error) throw error;
+
+                    if (!queueItem.result_data || !queueItem.result_data.image_url) {
+                        throw new Error('처리된 이미지를 찾을 수 없습니다.');
+                    }
+
+                    // Download the image
+                    const response = await fetch(queueItem.result_data.image_url);
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `generated-baby-face-${queueId}.png`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+
+                    window.URL.revokeObjectURL(url);
+
+                    this.showSuccess('이미지가 다운로드되었습니다!');
+                } catch (error) {
+                    console.error('이미지 다운로드 오류:', error);
+                    this.showError('이미지 다운로드에 실패했습니다.');
+                }
+            }
+
+            async viewProcessedImage(queueId) {
+                try {
+                    // Get queue item with result data
+                    const { data: queueItem, error } = await this.supabase
+                        .from('processing_queue')
+                        .select('result_data')
+                        .eq('id', queueId)
+                        .single();
+
+                    if (error) throw error;
+
+                    if (!queueItem.result_data || !queueItem.result_data.image_url) {
+                        throw new Error('처리된 이미지를 찾을 수 없습니다.');
+                    }
+
+                    // Show image in a modal or new window
+                    window.open(queueItem.result_data.image_url, '_blank');
+                } catch (error) {
+                    console.error('이미지 미리보기 오류:', error);
+                    this.showError('이미지를 미리볼 수 없습니다.');
+                }
+            }
+
+            // Purchase Functions
+            async buyNow(imageIndex, imageData) {
+                if (!this.isAuthenticated) {
+                    this.showLoginModal();
+                    return;
+                }
+
+                try {
+                    // Create a temporary generated image record for this purchase
+                    const { data: generatedImage, error: imageError } = await this.supabase
+                        .from('generated_images')
+                        .insert({
+                            user_id: this.currentUser.id,
+                            image_url: typeof imageData === 'string' ? imageData : imageData.src,
+                            thumbnail_url: typeof imageData === 'string' ? imageData : imageData.src,
+                            image_type: this.inputMode,
+                            generation_settings: {
+                                mode: this.inputMode,
+                                age: typeof imageData === 'object' ? imageData.age : null,
+                                generationMode: this.generationMode,
+                                comparisonType: this.comparisonType
+                            },
+                            price_cents: this.pricing[this.inputMode],
+                            is_purchased: false
+                        })
+                        .select()
+                        .single();
+
+                    if (imageError) throw imageError;
+
+                    // Create order for immediate purchase
+                    await this.createOrderFromItems([{
+                        image_id: generatedImage.id,
+                        quantity: 1,
+                        price_cents: this.pricing[this.inputMode]
+                    }]);
+
+                } catch (error) {
+                    console.error('바로 결제 오류:', error);
+                    this.showError('바로 결제에 실패했습니다.');
+                }
+            }
+
+            async addToCart(imageIndex, imageData) {
+                if (!this.isAuthenticated) {
+                    this.showLoginModal();
+                    return;
+                }
+
+                try {
+                    // Create a temporary generated image record for cart
+                    const { data: generatedImage, error: imageError } = await this.supabase
+                        .from('generated_images')
+                        .insert({
+                            user_id: this.currentUser.id,
+                            image_url: typeof imageData === 'string' ? imageData : imageData.src,
+                            thumbnail_url: typeof imageData === 'string' ? imageData : imageData.src,
+                            image_type: this.inputMode,
+                            generation_settings: {
+                                mode: this.inputMode,
+                                age: typeof imageData === 'object' ? imageData.age : null,
+                                generationMode: this.generationMode,
+                                comparisonType: this.comparisonType
+                            },
+                            price_cents: this.pricing[this.inputMode],
+                            is_purchased: false
+                        })
+                        .select()
+                        .single();
+
+                    if (imageError) throw imageError;
+
+                    // Add to cart
+                    const { error: cartError } = await this.supabase
+                        .from('cart_items')
+                        .insert({
+                            user_id: this.currentUser.id,
+                            image_id: generatedImage.id,
+                            quantity: 1,
+                            price_cents: this.pricing[this.inputMode]
+                        });
+
+                    if (cartError) {
+                        // If item already exists in cart, it will conflict due to unique constraint
+                        if (cartError.code === '23505') {
+                            this.showError('이미 장바구니에 담긴 이미지입니다.');
+                        } else {
+                            throw cartError;
+                        }
+                    } else {
+                        this.cartItems.push({
+                            id: generatedImage.id,
+                            image_id: generatedImage.id,
+                            user_id: this.currentUser.id,
+                            quantity: 1,
+                            price_cents: this.pricing[this.inputMode],
+                            generated_images: generatedImage
+                        });
+
+                        this.updateCartDisplay();
+                        this.showSuccess('장바구니에 추가되었습니다!');
+                    }
+
+                } catch (error) {
+                    console.error('장바구니 추가 오류:', error);
+                    this.showError('장바구니에 추가하는데 실패했습니다.');
+                }
+            }
+
             setupEventListeners() {
                 // API 키 관리
                 document.getElementById('save-api-key').addEventListener('click', () => this.saveApiKey());
@@ -2237,6 +2580,10 @@
                 // 주문 이력 관련
                 document.getElementById('orders-btn').addEventListener('click', () => this.showOrdersModal());
                 document.getElementById('close-orders').addEventListener('click', () => this.hideOrdersModal());
+
+                // 처리 대기열 관련
+                document.getElementById('queue-btn').addEventListener('click', () => this.showQueueModal());
+                document.getElementById('close-queue').addEventListener('click', () => this.hideQueueModal());
 
                 // 확인 모달 컨트롤
                 document.getElementById('close-confirmation').addEventListener('click', () => this.closeConfirmationModal());
