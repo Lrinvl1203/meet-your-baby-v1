@@ -593,6 +593,13 @@
         .purchase-btn.remove:hover {
             background: #dc2626;
         }
+        .purchase-btn.cancel {
+            background: #6b7280;
+            color: white;
+        }
+        .purchase-btn.cancel:hover {
+            background: #4b5563;
+        }
 
         /* Status badges for order history */
         .status-badge {
@@ -2938,10 +2945,13 @@ CRITICAL: Respond with only the generated image. Do not provide text description
                                 <div class="price-tag">${this.formatPrice(this.pricing[this.inputMode])}</div>
                                 <div class="purchase-buttons">
                                     <button class="purchase-btn buy-now" onclick="app.buyNow('${index}', ${JSON.stringify(imageData).replace(/"/g, '&quot;')})">
-                                        <i class="fas fa-credit-card" style="margin-right: 0.25rem;"></i>바로 구매
+                                        <i class="fas fa-credit-card" style="margin-right: 0.25rem;"></i>바로 결제
                                     </button>
                                     <button class="purchase-btn add-cart" onclick="app.addToCart('${index}', ${JSON.stringify(imageData).replace(/"/g, '&quot;')})">
                                         <i class="fas fa-cart-plus" style="margin-right: 0.25rem;"></i>장바구니
+                                    </button>
+                                    <button class="purchase-btn cancel" onclick="app.cancelPurchase()">
+                                        <i class="fas fa-times" style="margin-right: 0.25rem;"></i>취소
                                     </button>
                                 </div>
                                 <button class="download-btn" onclick="app.downloadImage('${imgSrc}', ${index})" style="margin-top: 0.5rem;">
@@ -2976,7 +2986,7 @@ CRITICAL: Respond with only the generated image. Do not provide text description
 
                         const buyNowBtn = document.createElement('button');
                         buyNowBtn.className = 'purchase-btn buy-now';
-                        buyNowBtn.innerHTML = '<i class="fas fa-credit-card" style="margin-right: 0.25rem;"></i>바로 구매';
+                        buyNowBtn.innerHTML = '<i class="fas fa-credit-card" style="margin-right: 0.25rem;"></i>바로 결제';
                         buyNowBtn.onclick = () => this.buyNow(index, imageData);
 
                         const addCartBtn = document.createElement('button');
@@ -2984,8 +2994,14 @@ CRITICAL: Respond with only the generated image. Do not provide text description
                         addCartBtn.innerHTML = '<i class="fas fa-cart-plus" style="margin-right: 0.25rem;"></i>장바구니';
                         addCartBtn.onclick = () => this.addToCart(index, imageData);
 
+                        const cancelBtn = document.createElement('button');
+                        cancelBtn.className = 'purchase-btn cancel';
+                        cancelBtn.innerHTML = '<i class="fas fa-times" style="margin-right: 0.25rem;"></i>취소';
+                        cancelBtn.onclick = () => this.cancelPurchase();
+
                         purchaseButtons.appendChild(buyNowBtn);
                         purchaseButtons.appendChild(addCartBtn);
+                        purchaseButtons.appendChild(cancelBtn);
 
                         // 다운로드 버튼
                         const downloadBtn = document.createElement('button');
@@ -3041,6 +3057,27 @@ CRITICAL: Respond with only the generated image. Do not provide text description
                 const errorElement = document.getElementById('error-message');
                 errorElement.style.display = 'none';
                 errorElement.textContent = '';
+            }
+
+            cancelPurchase() {
+                // 결과창을 숨기고 초기 상태로 돌아가기
+                document.getElementById('results-grid').style.display = 'none';
+                document.getElementById('loading-state').style.display = 'none';
+                document.getElementById('error-state').style.display = 'none';
+
+                // 파일 입력 초기화
+                this.fatherImages = [];
+                this.motherImages = [];
+                this.ultrasoundImages = [];
+
+                // 미리보기 업데이트
+                this.renderPreviews();
+
+                // 생성 버튼 상태 업데이트
+                this.updateGenerateButton();
+
+                // 성공 메시지 표시
+                this.showSuccess('생성을 취소했습니다. 새로운 이미지를 업로드해주세요.');
             }
 
             updateUI() {
