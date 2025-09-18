@@ -994,12 +994,15 @@
                 <!-- Summary content will be inserted here -->
             </div>
 
-            <div style="display: flex; gap: 1rem; justify-content: center;">
+            <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
                 <button id="cancel-generation" class="btn-secondary" style="padding: 0.75rem 1.5rem; font-weight: 500;">
                     <i class="fas fa-times" style="margin-right: 0.5rem;"></i>취소
                 </button>
+                <button id="add-to-cart-generation" class="btn-secondary" style="padding: 0.75rem 1.5rem; font-weight: 500; background: var(--color-primary); color: white; border: 1px solid var(--color-primary);">
+                    <i class="fas fa-cart-plus" style="margin-right: 0.5rem;"></i>장바구니
+                </button>
                 <button id="confirm-generation" class="generate-button" style="padding: 0.75rem 2rem;">
-                    <i class="fas fa-magic" style="margin-right: 0.5rem;"></i>생성하기
+                    <i class="fas fa-credit-card" style="margin-right: 0.5rem;"></i>즉시 결제 및 생성
                 </button>
             </div>
         </div>
@@ -2588,7 +2591,8 @@
                 // 확인 모달 컨트롤
                 document.getElementById('close-confirmation').addEventListener('click', () => this.closeConfirmationModal());
                 document.getElementById('cancel-generation').addEventListener('click', () => this.closeConfirmationModal());
-                document.getElementById('confirm-generation').addEventListener('click', () => this.generateBabyFace());
+                document.getElementById('add-to-cart-generation').addEventListener('click', () => this.generateAndAddToCart());
+                document.getElementById('confirm-generation').addEventListener('click', () => this.generateAndPurchase());
                 document.getElementById('confirmation-modal').addEventListener('click', (e) => {
                     if (e.target.id === 'confirmation-modal') this.closeConfirmationModal();
                 });
@@ -3025,6 +3029,85 @@
                 } catch (error) {
                     console.error('생성 오류:', error);
                     this.showErrorState(error.message || '아기 얼굴 생성에 실패했습니다. 다시 시도해주세요.');
+                } finally {
+                    this.isLoading = false;
+                    this.updateGenerateButton();
+                }
+            }
+
+            // 즉시 결제 및 생성
+            async generateAndPurchase() {
+                if (!this.isAuthenticated) {
+                    this.showLoginModal();
+                    return;
+                }
+
+                try {
+                    this.closeConfirmationModal();
+
+                    // 이미지 생성
+                    const generatedImages = await this.generateImagesOnly();
+
+                    // 생성된 이미지들을 즉시 결제 처리
+                    for (const [index, imageData] of generatedImages.entries()) {
+                        await this.buyNow(index, imageData);
+                    }
+
+                    this.showSuccess('이미지가 생성되고 결제가 진행되었습니다!');
+
+                } catch (error) {
+                    console.error('즉시 결제 및 생성 오류:', error);
+                    this.showError('즉시 결제 및 생성에 실패했습니다.');
+                }
+            }
+
+            // 장바구니에 추가
+            async generateAndAddToCart() {
+                if (!this.isAuthenticated) {
+                    this.showLoginModal();
+                    return;
+                }
+
+                try {
+                    this.closeConfirmationModal();
+
+                    // 이미지 생성
+                    const generatedImages = await this.generateImagesOnly();
+
+                    // 생성된 이미지들을 장바구니에 추가
+                    for (const [index, imageData] of generatedImages.entries()) {
+                        await this.addToCart(index, imageData);
+                    }
+
+                    this.showSuccess('이미지가 생성되고 장바구니에 추가되었습니다!');
+
+                } catch (error) {
+                    console.error('장바구니 추가 오류:', error);
+                    this.showError('장바구니 추가에 실패했습니다.');
+                }
+            }
+
+            // 이미지만 생성하는 함수 (UI 표시 없이)
+            async generateImagesOnly() {
+                this.isLoading = true;
+                this.updateGenerateButton();
+
+                try {
+                    let generatedImages = [];
+                    if (this.generationMode === 'singleAge') {
+                        const age = this.settings.babyAge === 'custom' ? `${this.settings.customAge} years old` : this.settings.babyAge;
+                        const results = await this.callGeminiAPI({ age, numberOfImages: this.settings.numberOfImages });
+                        generatedImages = results;
+                    } else {
+                        for (const age of this.settings.selectedPresetAges) {
+                            const resultsForAge = await this.callGeminiAPI({ age, numberOfImages: this.settings.ageProgressionCount });
+                            generatedImages.push(...resultsForAge.map(img => ({ src: img, age })));
+                        }
+                    }
+                    return generatedImages;
+                } catch (error) {
+                    console.error('이미지 생성 오류:', error);
+                    throw error;
                 } finally {
                     this.isLoading = false;
                     this.updateGenerateButton();
