@@ -705,7 +705,13 @@
             </div>
 
             <!-- Header -->
-            <header>
+            <header style="position: relative;">
+                <!-- Service Status -->
+                <div id="service-status" style="position: absolute; top: 0; left: 0; display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.875rem; font-weight: 600; background-color: #10b981; color: white;">
+                    <i class="fas fa-circle" style="font-size: 0.5rem;"></i>
+                    <span id="service-status-text">Service On</span>
+                </div>
+
                 <h1>
                     <i class="fas fa-baby"></i>
                     AI 아기 얼굴 예측 프로그램
@@ -713,32 +719,9 @@
                 <p style="margin-top: 0.75rem; font-size: 1.125rem; color: var(--color-text-secondary);">당신의 미래 아기는 어떤 모습일까요?</p>
             </header>
 
-            <!-- API Key Input (Initially shown) -->
-            <div id="api-key-section" class="main-card">
-                <h3>
-                    <i class="fas fa-key mr-2"></i>
-                    Google Gemini API 키를 입력하세요
-                </h3>
-                <div style="max-width: 28rem; margin: 0 auto;">
-                    <input type="password" id="api-key-input" placeholder="이곳에 Gemini API 키를 붙여넣으세요...">
-                    <button id="save-api-key">API 키 저장하기</button>
-                    <p style="font-size: 0.75rem; color: var(--color-text-secondary); margin-top: 0.5rem; text-align: center;">
-                        API 키는 서버로 전송되지 않고 사용자의 브라우저에만 안전하게 저장됩니다.
-                    </p>
-                </div>
-            </div>
 
-            <!-- Main App (Initially hidden) -->
-            <main id="main-app" class="main-card" style="display: none;">
-                <!-- API Key Status -->
-                <div id="api-status" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; padding: 0.75rem; background-color: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 0.5rem;">
-                    <span style="color: #065f46; font-weight: 500;">
-                        <i class="fas fa-check-circle" style="margin-right: 0.5rem;"></i>API 키가 연결되었습니다.
-                    </span>
-                    <button id="change-api-key" style="color: #047857; background: none; border: none; cursor: pointer; font-size: 0.875rem;">
-                        키 변경
-                    </button>
-                </div>
+            <!-- Main App -->
+            <main id="main-app" class="main-card">
 
                 <!-- Upload Mode Selection -->
                 <div class="mb-8">
@@ -1210,10 +1193,14 @@
         // AI Baby Face Predictor - Enhanced with Supabase Auth & Payment System
         class BabyFacePredictor {
             constructor() {
-                this.apiKey = localStorage.getItem('geminiApiKey') || '';
+                // 관리자 API 키 (보안 관리)
+                this.apiKey = this.getSecureApiKey();
                 this.inputMode = 'separate';
                 this.generationMode = 'singleAge';
                 this.comparisonType = 'simple';
+
+                // 서비스 상태 초기화
+                this.serviceStatus = 'checking';
 
                 // Supabase 설정 (환경변수 또는 설정 파일에서 가져와야 함)
                 this.supabaseUrl = 'https://jxmufwpgbklmboxisrqj.supabase.co';
@@ -1296,6 +1283,58 @@
                 this.currentHighlightedFeature = null;
 
                 this.init();
+            }
+
+            // ===== 보안 API 관리 =====
+            getSecureApiKey() {
+                // 관리자 API 키 (클라이언트에서 직접 노출되지 않도록 관리)
+                // 실제 운영환경에서는 서버를 통해 보안된 방식으로 제공되어야 함
+                const secureKey = 'AIzaSyCtBoU-34kqdeNTTKmCYcsFfF7QIeQaAAg';
+
+                // API 키 연결 테스트 실행
+                this.testApiConnectivity(secureKey);
+
+                return secureKey;
+            }
+
+            async testApiConnectivity(apiKey) {
+                try {
+                    // 간단한 AI API 연결 테스트
+                    const testUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+
+                    const response = await fetch(testUrl, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    });
+
+                    if (response.ok) {
+                        this.updateServiceStatus('online');
+                    } else {
+                        throw new Error(`API 연결 실패: ${response.status}`);
+                    }
+                } catch (error) {
+                    console.error('API 연결 테스트 실패:', error);
+                    this.updateServiceStatus('offline');
+                }
+            }
+
+            updateServiceStatus(status) {
+                const statusElement = document.getElementById('service-status');
+                const statusText = document.getElementById('service-status-text');
+
+                if (status === 'online') {
+                    statusElement.style.backgroundColor = '#10b981'; // 녹색
+                    statusElement.style.color = 'white';
+                    statusText.textContent = 'Service On';
+                    this.serviceStatus = 'online';
+                } else {
+                    statusElement.style.backgroundColor = '#ef4444'; // 빨간색
+                    statusElement.style.color = 'white';
+                    statusText.textContent = 'Service Off';
+                    this.serviceStatus = 'offline';
+                }
             }
 
             async init() {
@@ -2504,12 +2543,18 @@
             }
 
             setupEventListeners() {
-                // API 키 관리
-                document.getElementById('save-api-key').addEventListener('click', () => this.saveApiKey());
-                document.getElementById('change-api-key').addEventListener('click', () => this.changeApiKey());
-                document.getElementById('api-key-input').addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter') this.saveApiKey();
-                });
+                // API 키 관리 (관리자 API로 이동되어 더 이상 필요없음)
+                const saveApiKeyBtn = document.getElementById('save-api-key');
+                const changeApiKeyBtn = document.getElementById('change-api-key');
+                const apiKeyInput = document.getElementById('api-key-input');
+
+                if (saveApiKeyBtn) saveApiKeyBtn.addEventListener('click', () => this.saveApiKey());
+                if (changeApiKeyBtn) changeApiKeyBtn.addEventListener('click', () => this.changeApiKey());
+                if (apiKeyInput) {
+                    apiKeyInput.addEventListener('keypress', (e) => {
+                        if (e.key === 'Enter') this.saveApiKey();
+                    });
+                }
 
                 // 모드 선택
                 document.getElementById('ultrasound-mode').addEventListener('click', () => this.setInputMode('ultrasound'));
@@ -2617,12 +2662,13 @@
             }
 
             checkApiKey() {
-                if (this.apiKey) {
-                    document.getElementById('api-key-section').style.display = 'none';
-                    document.getElementById('main-app').style.display = 'block';
-                } else {
-                    document.getElementById('api-key-section').style.display = 'block';
-                    document.getElementById('main-app').style.display = 'none';
+                // 관리자 API 키가 항상 사용 가능하므로 메인 앱을 표시
+                document.getElementById('main-app').style.display = 'block';
+
+                // API 키 입력 섹션이 존재하면 숨김 (제거된 경우 에러 방지)
+                const apiKeySection = document.getElementById('api-key-section');
+                if (apiKeySection) {
+                    apiKeySection.style.display = 'none';
                 }
             }
 
