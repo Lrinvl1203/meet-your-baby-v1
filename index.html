@@ -1678,6 +1678,10 @@
 
                     // 2. 중복이 없으면 회원가입 진행
                     console.log('✅ 이메일 중복 없음, 회원가입 진행');
+                    console.log('🔄 회원가입 요청:', {
+                        email,
+                        redirect: `${window.location.origin}?confirmed=true`
+                    });
 
                     const { data, error } = await this.supabase.auth.signUp({
                         email,
@@ -1685,9 +1689,12 @@
                         options: {
                             data: {
                                 full_name: name
-                            }
+                            },
+                            emailRedirectTo: `${window.location.origin}?confirmed=true`
                         }
                     });
+
+                    console.log('📨 회원가입 응답:', { data, error });
 
                     if (error) {
                         // Supabase Auth 에러 메시지 처리
@@ -1705,7 +1712,31 @@
 
                     console.log('✅ 회원가입 성공:', data);
                     this.hideSignupModal();
-                    this.showSuccess('회원가입이 완료되었습니다! 이메일을 확인해주세요.');
+
+                    // 이메일 확인이 필요한 경우와 바로 로그인되는 경우 구분
+                    console.log('👤 사용자 정보:', {
+                        user: data.user,
+                        session: data.session,
+                        email_confirmed_at: data.user?.email_confirmed_at
+                    });
+
+                    if (data.user && !data.user.email_confirmed_at) {
+                        this.showSuccess('회원가입이 완료되었습니다! 이메일을 확인하여 계정을 활성화해주세요.\n\n⚠️ 이메일이 오지 않는다면 스팸함을 확인하거나 잠시 후 다시 시도해주세요.');
+                        console.log('📧 이메일 확인 필요 - Supabase 설정에서 "Enable email confirmations"이 활성화되어 있습니다.');
+
+                        // 이메일 재전송 옵션 제공
+                        setTimeout(() => {
+                            if (confirm('확인 이메일이 오지 않으셨나요? 이메일을 다시 전송하시겠습니까?')) {
+                                this.resendConfirmationEmail(email);
+                            }
+                        }, 10000); // 10초 후 재전송 옵션 제공
+                    } else if (data.user && data.session) {
+                        this.showSuccess('회원가입이 완료되어 자동으로 로그인되었습니다!');
+                        console.log('✅ 이메일 확인 없이 바로 로그인됨 - Supabase 설정에서 "Enable email confirmations"이 비활성화되어 있습니다.');
+                    } else {
+                        this.showSuccess('회원가입이 완료되었습니다! 로그인해주세요.');
+                        console.log('⚠️ 예상치 못한 상태:', { user: data.user, session: data.session });
+                    }
 
                 } catch (error) {
                     console.error('Signup error:', error);
@@ -4150,6 +4181,34 @@ CRITICAL: Respond with only the generated image. Do not provide text description
                 }
             }
 
+            // 이메일 확인 재전송
+            async resendConfirmationEmail(email) {
+                try {
+                    console.log('📧 확인 이메일 재전송 중:', email);
+
+                    const { data, error } = await this.supabase.auth.resend({
+                        type: 'signup',
+                        email,
+                        options: {
+                            emailRedirectTo: `${window.location.origin}?confirmed=true`
+                        }
+                    });
+
+                    if (error) {
+                        console.error('이메일 재전송 오류:', error);
+                        this.showError('이메일 재전송에 실패했습니다: ' + error.message);
+                        return;
+                    }
+
+                    console.log('✅ 확인 이메일 재전송 성공');
+                    this.showSuccess('확인 이메일을 다시 전송했습니다. 이메일을 확인해주세요.');
+
+                } catch (error) {
+                    console.error('Resend confirmation error:', error);
+                    this.showError('이메일 재전송에 실패했습니다.');
+                }
+            }
+
             // 비밀번호 찾기 처리
             async handleForgotPassword(e) {
                 e.preventDefault();
@@ -4194,6 +4253,18 @@ CRITICAL: Respond with only the generated image. Do not provide text description
 
         document.addEventListener('DOMContentLoaded', () => {
             window.app = new BabyFacePredictor();
+
+            // 이메일 확인 완료 또는 비밀번호 재설정 URL 파라미터 확인
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('confirmed') === 'true') {
+                window.app.showSuccess('이메일 인증이 완료되었습니다! 이제 로그인할 수 있습니다.');
+                // URL에서 파라미터 제거
+                window.history.replaceState({}, document.title, window.location.pathname);
+            } else if (urlParams.get('reset-password') === 'true') {
+                window.app.showSuccess('비밀번호가 재설정되었습니다! 새 비밀번호로 로그인해주세요.');
+                // URL에서 파라미터 제거
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
         });
     </script>
 </body>
