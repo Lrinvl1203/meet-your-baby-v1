@@ -1195,6 +1195,7 @@
             constructor() {
                 // 관리자 API 키 (보안 관리) - async로 로드됨
                 this.apiKey = null;
+                this._cachedApiKey = undefined; // 캐시 초기화
                 this.inputMode = 'separate';
                 this.generationMode = 'singleAge';
                 this.comparisonType = 'simple';
@@ -1287,6 +1288,12 @@
 
             // ===== 보안 API 관리 =====
             async getSecureApiKey() {
+                // 이미 로드된 키가 있으면 재사용 (캐싱)
+                if (this._cachedApiKey !== undefined) {
+                    console.log('✅ 캐시된 API 키 사용');
+                    return this._cachedApiKey;
+                }
+
                 // 다양한 소스에서 API 키 시도 (보안 순서대로)
                 let apiKey = null;
 
@@ -1336,8 +1343,12 @@
                 if (!apiKey) {
                     console.error('❌ API 키를 찾을 수 없습니다. 관리자에게 문의하세요.');
                     this.updateServiceStatus('offline');
+                    this._cachedApiKey = null;
                     return null;
                 }
+
+                // 캐시에 저장
+                this._cachedApiKey = apiKey;
 
                 // API 키 연결 테스트 실행
                 this.testApiConnectivity(apiKey);
