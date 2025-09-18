@@ -1056,15 +1056,17 @@
                 <div style="margin-bottom: 1.5rem;">
                     <label style="display: block; font-size: 0.875rem; font-weight: 500; color: #4b5563; margin-bottom: 0.25rem;">비밀번호</label>
                     <input type="password" id="login-password" class="form-input" placeholder="비밀번호를 입력하세요" required>
-                    <div id="login-error" style="display: none; color: #dc3545; font-size: 0.75rem; margin-top: 0.25rem;"></div>
                     <div style="text-align: right; margin-top: 0.5rem;">
                         <button type="button" id="forgot-password-link" style="color: var(--color-primary); background: none; border: none; cursor: pointer; text-decoration: underline; font-size: 0.75rem;">비밀번호를 잊으셨나요?</button>
                     </div>
                 </div>
 
-                <button type="submit" class="generate-button" style="width: 100%; margin-bottom: 1rem;">
+                <button type="submit" class="generate-button" id="login-submit-btn" style="width: 100%; margin-bottom: 1rem;">
                     <i class="fas fa-sign-in-alt" style="margin-right: 0.5rem;"></i>로그인
                 </button>
+
+                <!-- 로그인 오류 메시지를 버튼 아래로 이동 -->
+                <div id="login-error" style="display: none; color: #dc3545; font-size: 0.875rem; text-align: center; margin-bottom: 1rem; padding: 0.75rem; background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 0.375rem;"></div>
 
                 <div style="text-align: center; font-size: 0.875rem; color: var(--color-text-secondary);">
                     계정이 없으신가요? <button type="button" id="switch-to-signup" style="color: var(--color-primary); background: none; border: none; cursor: pointer; text-decoration: underline;">회원가입</button>
@@ -1594,24 +1596,43 @@
             // 이메일/비밀번호 로그인
             async handleLogin(e) {
                 e.preventDefault();
+                console.log('🔄 로그인 시도 시작');
+
                 const email = document.getElementById('login-email').value.trim();
                 const password = document.getElementById('login-password').value;
+
+                console.log('📧 로그인 정보:', {
+                    email: email ? '***@' + email.split('@')[1] : '없음',
+                    hasPassword: !!password
+                });
 
                 // 이전 오류 메시지 숨기기
                 this.hideLoginError();
 
+                // 로그인 버튼 비활성화
+                const loginBtn = document.getElementById('login-submit-btn');
+                if (loginBtn) {
+                    loginBtn.disabled = true;
+                    loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right: 0.5rem;"></i>로그인 중...';
+                }
+
                 if (!email || !password) {
                     this.showLoginError('이메일과 비밀번호를 입력해주세요.');
+                    this.resetLoginButton(loginBtn);
                     return;
                 }
 
                 try {
+                    console.log('🔑 Supabase 로그인 요청 중...');
                     const { data, error } = await this.supabase.auth.signInWithPassword({
                         email,
                         password
                     });
 
+                    console.log('📨 로그인 응답:', { data, error });
+
                     if (error) {
+                        console.error('❌ 로그인 오류:', error);
                         // Supabase Auth 에러 메시지 처리
                         if (error.message.includes('Invalid login credentials')) {
                             this.showLoginError('이메일 또는 비밀번호가 올바르지 않습니다.');
@@ -1622,16 +1643,27 @@
                         } else {
                             this.showLoginError(error.message || '로그인에 실패했습니다.');
                         }
+                        this.resetLoginButton(loginBtn);
                         return;
                     }
 
                     console.log('✅ 로그인 성공:', data);
                     this.hideLoginModal();
                     this.showSuccess('로그인되었습니다!');
+                    this.resetLoginButton(loginBtn);
 
                 } catch (error) {
-                    console.error('Login error:', error);
+                    console.error('💥 로그인 예외:', error);
                     this.showLoginError(error.message || '로그인에 실패했습니다.');
+                    this.resetLoginButton(loginBtn);
+                }
+            }
+
+            // 로그인 버튼 상태 복원
+            resetLoginButton(loginBtn) {
+                if (loginBtn) {
+                    loginBtn.disabled = false;
+                    loginBtn.innerHTML = '<i class="fas fa-sign-in-alt" style="margin-right: 0.5rem;"></i>로그인';
                 }
             }
 
@@ -2929,7 +2961,65 @@
                 document.getElementById('switch-to-login').addEventListener('click', () => this.switchToLogin());
 
                 // 인증 폼 제출
-                document.getElementById('login-form').addEventListener('submit', (e) => this.handleLogin(e));
+                // 로그인 폼 이벤트 리스너
+                const loginForm = document.getElementById('login-form');
+                if (loginForm) {
+                    console.log('✅ 로그인 폼 이벤트 리스너 연결됨');
+                    loginForm.addEventListener('submit', (e) => {
+                        console.log('🔄 로그인 폼 submit 이벤트 발생');
+                        this.handleLogin(e);
+                    });
+                } else {
+                    console.error('❌ 로그인 폼을 찾을 수 없습니다');
+                }
+
+                // 로그인 버튼 직접 클릭 이벤트도 추가 (백업용)
+                const loginBtn = document.getElementById('login-submit-btn');
+                if (loginBtn) {
+                    console.log('✅ 로그인 버튼 클릭 이벤트 리스너 연결됨');
+                    loginBtn.addEventListener('click', (e) => {
+                        console.log('🔄 로그인 버튼 클릭 이벤트 발생');
+                        // 폼 submit 이벤트가 정상적으로 발생하지 않을 경우 백업
+                        if (e.target.type === 'submit') {
+                            console.log('🔄 submit 타입 버튼이므로 폼 제출 처리');
+                            const form = e.target.closest('form');
+                            if (form) {
+                                form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+                            }
+                        }
+                    });
+                } else {
+                    console.error('❌ 로그인 버튼을 찾을 수 없습니다');
+                }
+
+                // 로그인 입력 필드에서 Enter 키 처리
+                const loginEmailInput = document.getElementById('login-email');
+                const loginPasswordInput = document.getElementById('login-password');
+
+                if (loginEmailInput) {
+                    loginEmailInput.addEventListener('keypress', (e) => {
+                        if (e.key === 'Enter') {
+                            console.log('🔄 이메일 필드에서 Enter 키 누름');
+                            e.preventDefault();
+                            if (loginForm) {
+                                loginForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+                            }
+                        }
+                    });
+                }
+
+                if (loginPasswordInput) {
+                    loginPasswordInput.addEventListener('keypress', (e) => {
+                        if (e.key === 'Enter') {
+                            console.log('🔄 비밀번호 필드에서 Enter 키 누름');
+                            e.preventDefault();
+                            if (loginForm) {
+                                loginForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+                            }
+                        }
+                    });
+                }
+
                 document.getElementById('signup-form').addEventListener('submit', (e) => this.handleSignup(e));
 
                 // 소셜 로그인
