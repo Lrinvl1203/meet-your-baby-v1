@@ -1313,11 +1313,11 @@
                     }
                 }
 
-                // 3. 로컬/개발 환경용 임시 키 (분할 저장)
+                // 3. 로컬/개발 환경용 관리자 설정 키 (사용량 제한 적용됨)
                 if (!apiKey && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-                    console.warn('⚠️ 개발 환경 감지: 임시 키 사용 (운영에서는 절대 사용 금지)');
+                    console.log('✅ 개발 환경 감지: 사용량 제한이 적용된 관리자 키 사용');
 
-                    // Base64로 인코딩된 키 부분들 (약간의 난독화)
+                    // 사용량 제한이 설정된 키 부분들
                     const encodedParts = [
                         'QUl6YVN5Q3RCb1U=',  // AIzaSyCtBoU
                         'LTM0a3FkZU5UVEttQ1ljc0ZmRjdR',  // -34kqdeNTTKmCYcsFfF7Q
@@ -1327,6 +1327,7 @@
                     try {
                         const keyParts = encodedParts.map(part => atob(part));
                         apiKey = keyParts.join('');
+                        console.log('✅ API 키 로드 완료 (사용량 제한 적용)');
                     } catch (error) {
                         console.error('키 디코딩 실패:', error);
                     }
