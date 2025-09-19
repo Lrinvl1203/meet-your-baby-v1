@@ -1120,6 +1120,15 @@
                     <input type="password" id="signup-password-confirm" class="form-input" placeholder="비밀번호를 다시 입력하세요" required>
                 </div>
 
+                <!-- 개발자 모드 옵션 (숨김) -->
+                <div id="dev-mode-options" style="display: none; margin-bottom: 1rem; padding: 0.75rem; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 0.375rem;">
+                    <label style="display: flex; align-items: center; font-size: 0.75rem; color: #856404; cursor: pointer;">
+                        <input type="checkbox" id="skip-email-verification" style="margin-right: 0.5rem;">
+                        개발자 모드: 이메일 확인 없이 가입 (테스트용)
+                    </label>
+                    <p style="font-size: 0.625rem; color: #856404; margin: 0.25rem 0 0 1rem;">⚠️ 이 옵션은 개발/테스트 목적으로만 사용하세요</p>
+                </div>
+
                 <button type="submit" class="generate-button" style="width: 100%; margin-bottom: 1rem;">
                     <i class="fas fa-user-plus" style="margin-right: 0.5rem;"></i>회원가입
                 </button>
@@ -1708,27 +1717,39 @@
                         return;
                     }
 
-                    // 2. 중복이 없으면 회원가입 진행
+                    // 2. 개발자 모드 확인
+                    const skipEmailVerification = document.getElementById('skip-email-verification')?.checked || false;
+                    console.log('🔧 개발자 모드:', { skipEmailVerification });
+
+                    // 3. 중복이 없으면 회원가입 진행
                     console.log('✅ 이메일 중복 없음, 회원가입 진행');
                     console.log('🔄 회원가입 요청:', {
                         email,
+                        skipEmailVerification,
                         redirect: `${window.location.origin}?confirmed=true`
                     });
+
+                    let signUpOptions = {
+                        data: {
+                            full_name: name
+                        }
+                    };
+
+                    // 개발자 모드가 아닌 경우에만 이메일 리다이렉트 URL 추가
+                    if (!skipEmailVerification) {
+                        signUpOptions.emailRedirectTo = `${window.location.origin}?confirmed=true`;
+                    }
 
                     const { data, error } = await this.supabase.auth.signUp({
                         email,
                         password,
-                        options: {
-                            data: {
-                                full_name: name
-                            },
-                            emailRedirectTo: `${window.location.origin}?confirmed=true`
-                        }
+                        options: signUpOptions
                     });
 
                     console.log('📨 회원가입 응답:', { data, error });
 
                     if (error) {
+                        console.error('❌ 회원가입 오류:', error);
                         // Supabase Auth 에러 메시지 처리
                         if (error.message.includes('User already registered')) {
                             this.showError('이미 가입된 이메일입니다. 로그인을 시도해주세요.');
@@ -1736,8 +1757,12 @@
                             this.showError('올바른 이메일 주소를 입력해주세요.');
                         } else if (error.message.includes('Password should be at least')) {
                             this.showError('비밀번호는 최소 6자 이상이어야 합니다.');
+                        } else if (error.message.includes('Signups not allowed')) {
+                            this.showError('현재 회원가입이 비활성화되어 있습니다. 관리자에게 문의하세요.');
+                        } else if (error.message.includes('Email rate limit exceeded')) {
+                            this.showError('이메일 전송 한도를 초과했습니다. 잠시 후 다시 시도해주세요.');
                         } else {
-                            this.showError(error.message || '회원가입에 실패했습니다.');
+                            this.showError(`회원가입에 실패했습니다: ${error.message}`);
                         }
                         return;
                     }
@@ -1749,25 +1774,53 @@
                     console.log('👤 사용자 정보:', {
                         user: data.user,
                         session: data.session,
-                        email_confirmed_at: data.user?.email_confirmed_at
+                        email_confirmed_at: data.user?.email_confirmed_at,
+                        confirmation_sent_at: data.user?.confirmation_sent_at
                     });
 
-                    if (data.user && !data.user.email_confirmed_at) {
-                        this.showSuccess('회원가입이 완료되었습니다! 이메일을 확인하여 계정을 활성화해주세요.\n\n⚠️ 이메일이 오지 않는다면 스팸함을 확인하거나 잠시 후 다시 시도해주세요.');
-                        console.log('📧 이메일 확인 필요 - Supabase 설정에서 "Enable email confirmations"이 활성화되어 있습니다.');
+                    // Supabase 이메일 확인 설정 감지
+                    const hasSession = data.session && data.session.access_token;
+                    const needsEmailConfirmation = data.user && !data.user.email_confirmed_at && !hasSession && !skipEmailVerification;
 
-                        // 이메일 재전송 옵션 제공
-                        setTimeout(() => {
-                            if (confirm('확인 이메일이 오지 않으셨나요? 이메일을 다시 전송하시겠습니까?')) {
+                    if (skipEmailVerification) {
+                        console.log('🔧 개발자 모드: 이메일 확인 건너뛰기');
+                        this.showSuccess('개발자 모드로 회원가입이 완료되었습니다!\n\n이메일 확인 없이 바로 로그인할 수 있습니다.');
+                    } else if (needsEmailConfirmation) {
+                        console.log('📧 이메일 확인 필요 - Supabase에서 "Enable email confirmations"이 활성화되어 있습니다.');
+
+                        // 이메일 전송 확인
+                        if (data.user.confirmation_sent_at) {
+                            console.log('✅ 확인 이메일 전송됨:', data.user.confirmation_sent_at);
+                            this.showSuccess(`회원가입이 완료되었습니다!\n\n📧 ${email}로 확인 이메일을 전송했습니다.\n이메일의 링크를 클릭하여 계정을 활성화해주세요.\n\n⚠️ 이메일이 오지 않는다면:\n• 스팸함을 확인해주세요\n• 잠시 후 재전송 옵션을 이용해주세요`);
+
+                            // 이메일 재전송 옵션 제공
+                            setTimeout(() => {
+                                if (confirm('확인 이메일이 도착하지 않으셨나요?\n\n이메일을 다시 전송하시겠습니까?')) {
+                                    this.resendConfirmationEmail(email);
+                                }
+                            }, 15000); // 15초 후 재전송 옵션 제공
+                        } else {
+                            console.warn('⚠️ 확인 이메일이 전송되지 않았을 수 있습니다.');
+                            this.showError('회원가입은 완료되었지만 확인 이메일 전송에 문제가 발생했습니다.\n\n아래 버튼을 클릭하여 이메일을 재전송해주세요.');
+
+                            // 즉시 재전송 옵션 제공
+                            setTimeout(() => {
                                 this.resendConfirmationEmail(email);
-                            }
-                        }, 10000); // 10초 후 재전송 옵션 제공
-                    } else if (data.user && data.session) {
+                            }, 2000);
+                        }
+                    } else if (hasSession) {
                         this.showSuccess('회원가입이 완료되어 자동으로 로그인되었습니다!');
                         console.log('✅ 이메일 확인 없이 바로 로그인됨 - Supabase 설정에서 "Enable email confirmations"이 비활성화되어 있습니다.');
+                    } else if (data.user && data.user.email_confirmed_at) {
+                        this.showSuccess('회원가입이 완료되었습니다! 이메일이 이미 확인되어 바로 로그인할 수 있습니다.');
+                        console.log('✅ 이메일이 이미 확인된 상태입니다.');
                     } else {
                         this.showSuccess('회원가입이 완료되었습니다! 로그인해주세요.');
-                        console.log('⚠️ 예상치 못한 상태:', { user: data.user, session: data.session });
+                        console.log('⚠️ 예상치 못한 상태:', {
+                            user: data.user,
+                            session: data.session,
+                            email_confirmed_at: data.user?.email_confirmed_at
+                        });
                     }
 
                 } catch (error) {
@@ -3077,6 +3130,12 @@
                             this.closeModal();
                         }
                     }
+
+                    // 개발자 모드 활성화: Ctrl+Shift+D
+                    if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+                        e.preventDefault();
+                        this.toggleDevMode();
+                    }
                 });
             }
 
@@ -4276,6 +4335,9 @@ CRITICAL: Respond with only the generated image. Do not provide text description
                 try {
                     console.log('📧 확인 이메일 재전송 중:', email);
 
+                    // 재전송 전 상태 메시지 표시
+                    this.showSuccess('이메일을 재전송하고 있습니다...');
+
                     const { data, error } = await this.supabase.auth.resend({
                         type: 'signup',
                         email,
@@ -4284,18 +4346,51 @@ CRITICAL: Respond with only the generated image. Do not provide text description
                         }
                     });
 
+                    console.log('📨 재전송 응답:', { data, error });
+
                     if (error) {
-                        console.error('이메일 재전송 오류:', error);
-                        this.showError('이메일 재전송에 실패했습니다: ' + error.message);
+                        console.error('❌ 이메일 재전송 오류:', error);
+                        if (error.message.includes('Email rate limit exceeded')) {
+                            this.showError('이메일 전송 한도를 초과했습니다. 잠시 후 다시 시도해주세요.');
+                        } else if (error.message.includes('User not found')) {
+                            this.showError('해당 이메일로 가입된 계정을 찾을 수 없습니다.');
+                        } else if (error.message.includes('Email already confirmed')) {
+                            this.showSuccess('이미 이메일 확인이 완료된 계정입니다. 로그인해주세요.');
+                        } else {
+                            this.showError(`이메일 재전송에 실패했습니다: ${error.message}`);
+                        }
                         return;
                     }
 
                     console.log('✅ 확인 이메일 재전송 성공');
-                    this.showSuccess('확인 이메일을 다시 전송했습니다. 이메일을 확인해주세요.');
+                    this.showSuccess(`확인 이메일을 ${email}로 다시 전송했습니다!\n\n📧 이메일을 확인하고 링크를 클릭해주세요.\n\n⚠️ 이메일이 오지 않는다면:\n• 스팸함을 확인해주세요\n• 몇 분 정도 기다려주세요\n• 이메일 주소가 정확한지 확인해주세요`);
+
+                    // 추가 재전송 옵션 제공
+                    setTimeout(() => {
+                        if (confirm('여전히 이메일이 오지 않으셨나요?\n\n다른 이메일 주소로 다시 가입하거나 관리자에게 문의하시겠습니까?')) {
+                            this.showError('이메일 전송에 지속적인 문제가 있는 것 같습니다.\n\n해결 방법:\n1. 다른 이메일 주소로 가입 시도\n2. 관리자에게 문의\n3. 잠시 후 다시 시도');
+                        }
+                    }, 30000); // 30초 후 추가 옵션 제공
 
                 } catch (error) {
-                    console.error('Resend confirmation error:', error);
-                    this.showError('이메일 재전송에 실패했습니다.');
+                    console.error('💥 이메일 재전송 예외:', error);
+                    this.showError(`이메일 재전송 중 오류가 발생했습니다: ${error.message}`);
+                }
+            }
+
+            // 개발자 모드 토글
+            toggleDevMode() {
+                const devModeOptions = document.getElementById('dev-mode-options');
+                if (devModeOptions) {
+                    const isVisible = devModeOptions.style.display !== 'none';
+                    devModeOptions.style.display = isVisible ? 'none' : 'block';
+
+                    if (!isVisible) {
+                        console.log('🔧 개발자 모드 활성화됨');
+                        this.showSuccess('개발자 모드가 활성화되었습니다!\n\n회원가입 시 이메일 확인을 건너뛸 수 있습니다.');
+                    } else {
+                        console.log('🔧 개발자 모드 비활성화됨');
+                    }
                 }
             }
 
