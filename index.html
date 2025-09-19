@@ -4452,8 +4452,12 @@ CRITICAL: Respond with only the generated image. Do not provide text description
                             isDevelopmentUser: true
                         };
 
+                        // 인증 상태 직접 설정
+                        this.isAuthenticated = true;
+
                         // 로그인 상태 UI 업데이트
                         this.updateAuthUI();
+                        this.loadCartItems();
                         this.showSuccess('🔧 개발 모드 임시 로그인 성공!\n\n이제 모든 기능을 테스트할 수 있습니다.');
                         return;
                     }
