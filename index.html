@@ -4423,9 +4423,22 @@ CRITICAL: Respond with only the generated image. Do not provide text description
 
                     if (!isVisible) {
                         console.log('🔧 개발자 모드 활성화됨');
-                        this.showSuccess('개발자 모드가 활성화되었습니다!\n\n회원가입 시 이메일 확인을 건너뛸 수 있습니다.\n\n빠른 테스트 로그인:\n- 이메일: dev@test.com\n- 비밀번호: test123456');
 
-                        // 빠른 테스트 계정 생성
+                        // 즉시 개발 모드 로그인 설정
+                        this.currentUser = {
+                            id: 'dev-user-' + Date.now(),
+                            email: 'dev@test.com',
+                            user_metadata: {},
+                            app_metadata: {},
+                            isDevelopmentUser: true
+                        };
+                        this.isAuthenticated = true;
+                        this.updateAuthUI();
+                        this.loadCartItems();
+
+                        this.showSuccess('🔧 개발자 모드 활성화됨!\n\n임시 로그인 완료 - 모든 기능 테스트 가능\n\n개발 계정: dev@test.com');
+
+                        // 추가 테스트 계정 생성 (백그라운드)
                         this.createDevTestAccount();
                     } else {
                         console.log('🔧 개발자 모드 비활성화됨');
@@ -4440,9 +4453,17 @@ CRITICAL: Respond with only the generated image. Do not provide text description
                     const testPassword = 'test123456';
 
                     console.log('🔧 개발자 테스트 계정 생성 시도');
+                    console.log('🔧 현재 호스트명:', window.location.hostname);
 
-                    // 개발 모드에서는 가짜 사용자로 로그인 우회
-                    if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
+                    // 개발 모드에서는 가짜 사용자로 로그인 우회 (조건 완화)
+                    const isLocalDev = window.location.hostname === '127.0.0.1' ||
+                                     window.location.hostname === 'localhost' ||
+                                     window.location.protocol === 'file:' ||
+                                     window.location.port === '8000';
+
+                    console.log('🔧 개발 환경 체크:', isLocalDev);
+
+                    if (isLocalDev) {
                         console.log('🔧 개발 환경 감지 - 임시 사용자 생성');
                         this.currentUser = {
                             id: 'dev-user-' + Date.now(),
