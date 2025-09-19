@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI 아기 얼굴 예측 프로그램</title>
+    <!-- Cache buster: 2025-09-19-14:30 -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/@polar-sh/sdk@latest/dist/index.umd.js"></script>
@@ -1868,6 +1869,16 @@
                 if (!this.isAuthenticated) return;
 
                 try {
+                    // 개발 모드 사용자인 경우 로컬 스토리지 사용
+                    if (this.currentUser && this.currentUser.isDevelopmentUser) {
+                        console.log('🔧 개발 모드 - 로컬 장바구니 로드');
+                        const localCart = JSON.parse(localStorage.getItem('dev_cart_items') || '[]');
+                        this.cartItems = localCart;
+                        this.updateCartUI();
+                        console.log('✅ 개발 모드 장바구니 로드 완료:', this.cartItems);
+                        return;
+                    }
+
                     const { data: cartItems, error } = await this.supabase
                         .from('cart_items')
                         .select(`
@@ -2073,6 +2084,7 @@
             }
 
             renderCartItems() {
+                console.log('🛒 renderCartItems 호출됨, cartItems:', this.cartItems);
                 const container = document.getElementById('cart-items');
                 container.innerHTML = '';
 
@@ -2086,21 +2098,27 @@
                     return;
                 }
 
-                this.cartItems.forEach(item => {
+                this.cartItems.forEach((item, index) => {
+                    console.log(`🛒 처리 중인 item ${index}:`, item);
                     const itemDiv = document.createElement('div');
                     itemDiv.style.cssText = 'display: flex; gap: 1rem; padding: 1rem; border-bottom: 1px solid var(--color-border);';
 
-                    const imageData = item.generated_images;
+                    // item_data에서 데이터 가져오기
+                    const itemData = item.item_data || {};
+                    const imageType = itemData.type || 'separate';
+                    const settings = itemData.settings || {};
+
                     itemDiv.innerHTML = `
-                        <img src="${imageData.thumbnail_url || imageData.image_url}"
-                             alt="Cart item"
-                             style="width: 60px; height: 60px; object-fit: cover; border-radius: 0.5rem;">
+                        <div style="width: 60px; height: 60px; background: var(--color-border); border-radius: 0.5rem;
+                                    display: flex; align-items: center; justify-content: center; color: var(--color-text-secondary);">
+                            <i class="fas fa-baby" style="font-size: 1.5rem;"></i>
+                        </div>
                         <div style="flex: 1;">
                             <div style="font-weight: 600; margin-bottom: 0.25rem;">
-                                ${this.getImageTypeLabel(imageData.image_type)} 이미지
+                                ${this.getImageTypeLabel(imageType)} 이미지
                             </div>
                             <div style="font-size: 0.875rem; color: var(--color-text-secondary);">
-                                ${imageData.generation_settings?.age || ''}
+                                수량: ${item.quantity}개, ${settings.selectedAges?.join(', ') || '3개월'}
                             </div>
                             <div style="font-weight: 600; color: var(--color-secondary);">
                                 ${this.formatPrice(item.price_cents)}
@@ -3778,6 +3796,24 @@
             // 장바구니에 항목 추가
             async addItemToCart(cartItem) {
                 try {
+                    // 개발 모드 사용자인 경우 로컬 스토리지 사용
+                    if (this.currentUser.isDevelopmentUser) {
+                        console.log('🔧 개발 모드 - 로컬 장바구니 사용');
+                        const localCart = JSON.parse(localStorage.getItem('dev_cart_items') || '[]');
+                        const newItem = {
+                            id: 'dev-cart-' + Date.now(),
+                            user_id: this.currentUser.id,
+                            item_data: cartItem,
+                            price_cents: cartItem.total,
+                            quantity: cartItem.quantity,
+                            added_at: new Date().toISOString()
+                        };
+                        localCart.push(newItem);
+                        localStorage.setItem('dev_cart_items', JSON.stringify(localCart));
+                        console.log('✅ 개발 모드 장바구니 추가 성공:', newItem);
+                        return;
+                    }
+
                     const { data, error } = await this.supabase
                         .from('cart_items')
                         .insert([{
@@ -4387,10 +4423,72 @@ CRITICAL: Respond with only the generated image. Do not provide text description
 
                     if (!isVisible) {
                         console.log('🔧 개발자 모드 활성화됨');
-                        this.showSuccess('개발자 모드가 활성화되었습니다!\n\n회원가입 시 이메일 확인을 건너뛸 수 있습니다.');
+                        this.showSuccess('개발자 모드가 활성화되었습니다!\n\n회원가입 시 이메일 확인을 건너뛸 수 있습니다.\n\n빠른 테스트 로그인:\n- 이메일: dev@test.com\n- 비밀번호: test123456');
+
+                        // 빠른 테스트 계정 생성
+                        this.createDevTestAccount();
                     } else {
                         console.log('🔧 개발자 모드 비활성화됨');
                     }
+                }
+            }
+
+            // 개발자 모드 테스트 계정 생성
+            async createDevTestAccount() {
+                try {
+                    const testEmail = 'dev@test.com';
+                    const testPassword = 'test123456';
+
+                    console.log('🔧 개발자 테스트 계정 생성 시도');
+
+                    // 개발 모드에서는 가짜 사용자로 로그인 우회
+                    if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
+                        console.log('🔧 개발 환경 감지 - 임시 사용자 생성');
+                        this.currentUser = {
+                            id: 'dev-user-' + Date.now(),
+                            email: testEmail,
+                            user_metadata: {},
+                            app_metadata: {},
+                            isDevelopmentUser: true
+                        };
+
+                        // 로그인 상태 UI 업데이트
+                        this.updateAuthUI();
+                        this.showSuccess('🔧 개발 모드 임시 로그인 성공!\n\n이제 모든 기능을 테스트할 수 있습니다.');
+                        return;
+                    }
+
+                    // 일반 로그인 시도
+                    const { data: loginData, error: loginError } = await this.supabase.auth.signInWithPassword({
+                        email: testEmail,
+                        password: testPassword
+                    });
+
+                    if (loginData.user) {
+                        console.log('✅ 개발자 테스트 계정 로그인 성공');
+                        return;
+                    }
+
+                    // 로그인 실패 시 계정 생성
+                    console.log('🔧 개발자 테스트 계정 생성 중...');
+                    const { data: signupData, error: signupError } = await this.supabase.auth.signUp({
+                        email: testEmail,
+                        password: testPassword,
+                        options: {
+                            data: {
+                                skipEmailVerification: true
+                            }
+                        }
+                    });
+
+                    if (signupError) {
+                        console.log('⚠️ 개발자 계정 이미 존재하거나 생성 실패:', signupError.message);
+                    } else {
+                        console.log('✅ 개발자 테스트 계정 생성 완료');
+                    }
+
+                } catch (error) {
+                    console.error('💥 개발자 계정 생성 오류:', error);
                 }
             }
 

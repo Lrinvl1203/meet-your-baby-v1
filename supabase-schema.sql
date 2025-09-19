@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS cart_items (
     image_id UUID REFERENCES generated_images(id) ON DELETE CASCADE,
     quantity INTEGER DEFAULT 1 CHECK (quantity > 0),
     price_cents INTEGER NOT NULL,
+    item_data JSONB NOT NULL DEFAULT '{}', -- Stores generation settings and metadata
     added_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(user_id, image_id) -- Prevent duplicate items
 );
