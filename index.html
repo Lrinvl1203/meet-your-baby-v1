@@ -4424,19 +4424,23 @@ CRITICAL: Respond with only the generated image. Do not provide text description
                     if (!isVisible) {
                         console.log('🔧 개발자 모드 활성화됨');
 
-                        // 즉시 개발 모드 로그인 설정
+                        // 즉시 개발 모드 로그인 설정 (고정 ID 사용)
                         this.currentUser = {
-                            id: 'dev-user-' + Date.now(),
+                            id: 'dev-user-fixed',
                             email: 'dev@test.com',
                             user_metadata: {},
                             app_metadata: {},
                             isDevelopmentUser: true
                         };
                         this.isAuthenticated = true;
+
+                        // 기존 다른 사용자 ID 장바구니 데이터 정리
+                        localStorage.removeItem('dev_cart_items');
+
                         this.updateAuthUI();
                         this.loadCartItems();
 
-                        this.showSuccess('🔧 개발자 모드 활성화됨!\n\n임시 로그인 완료 - 모든 기능 테스트 가능\n\n개발 계정: dev@test.com');
+                        this.showSuccess('🔧 개발자 모드 활성화됨!\n\n임시 로그인 완료 - 모든 기능 테스트 가능\n\n개발 계정: dev@test.com\n장바구니 초기화됨');
 
                         // 추가 테스트 계정 생성 (백그라운드)
                         this.createDevTestAccount();
@@ -4466,7 +4470,7 @@ CRITICAL: Respond with only the generated image. Do not provide text description
                     if (isLocalDev) {
                         console.log('🔧 개발 환경 감지 - 임시 사용자 생성');
                         this.currentUser = {
-                            id: 'dev-user-' + Date.now(),
+                            id: 'dev-user-fixed',
                             email: testEmail,
                             user_metadata: {},
                             app_metadata: {},
