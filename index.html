@@ -1169,13 +1169,13 @@
                     <input type="password" id="signup-password-confirm" class="form-input" placeholder="비밀번호를 다시 입력하세요" required>
                 </div>
 
-                <!-- 개발자 모드 옵션 (숨김) -->
-                <div id="dev-mode-options" style="display: none; margin-bottom: 1rem; padding: 0.75rem; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 0.375rem;">
-                    <label style="display: flex; align-items: center; font-size: 0.75rem; color: #856404; cursor: pointer;">
+                <!-- 이메일 확인 건너뛰기 옵션 -->
+                <div id="email-skip-options" style="margin-bottom: 1rem; padding: 0.75rem; background-color: #e3f2fd; border: 1px solid #2196f3; border-radius: 0.375rem;">
+                    <label style="display: flex; align-items: center; font-size: 0.875rem; color: #1565c0; cursor: pointer;">
                         <input type="checkbox" id="skip-email-verification" style="margin-right: 0.5rem;">
-                        개발자 모드: 이메일 확인 없이 가입 (테스트용)
+                        이메일 확인 건너뛰기 (즉시 로그인)
                     </label>
-                    <p style="font-size: 0.625rem; color: #856404; margin: 0.25rem 0 0 1rem;">⚠️ 이 옵션은 개발/테스트 목적으로만 사용하세요</p>
+                    <p style="font-size: 0.75rem; color: #1565c0; margin: 0.25rem 0 0 1rem;">📧 이메일 제한으로 인해 확인 메일이 오지 않을 수 있습니다. 이 옵션을 체크하면 즉시 로그인됩니다.</p>
                 </div>
 
                 <button type="submit" class="generate-button" style="width: 100%; margin-bottom: 1rem;">
@@ -1795,18 +1795,20 @@
                     if (error) {
                         console.error('❌ 회원가입 오류:', error);
                         // Supabase Auth 에러 메시지 처리
-                        if (error.message.includes('User already registered')) {
-                            this.showError('이미 가입된 이메일입니다. 로그인을 시도해주세요.');
+                        if (error.message.includes('User already registered') || error.message.includes('already')) {
+                            this.hideSignupModal();
+                            this.showLoginModal();
+                            this.showError('⚠️ 이미 가입된 이메일입니다.\n\n아래 로그인 폼에서 기존 계정으로 로그인해주세요.\n\n비밀번호를 잊으셨다면 "비밀번호 찾기"를 이용하세요.');
                         } else if (error.message.includes('Invalid email')) {
-                            this.showError('올바른 이메일 주소를 입력해주세요.');
+                            this.showError('❌ 올바른 이메일 주소를 입력해주세요.');
                         } else if (error.message.includes('Password should be at least')) {
-                            this.showError('비밀번호는 최소 6자 이상이어야 합니다.');
+                            this.showError('❌ 비밀번호는 최소 6자 이상이어야 합니다.');
                         } else if (error.message.includes('Signups not allowed')) {
-                            this.showError('현재 회원가입이 비활성화되어 있습니다. 관리자에게 문의하세요.');
+                            this.showError('⚠️ 현재 회원가입이 비활성화되어 있습니다. 관리자에게 문의하세요.');
                         } else if (error.message.includes('Email rate limit exceeded')) {
-                            this.showError('이메일 전송 한도를 초과했습니다. 잠시 후 다시 시도해주세요.');
+                            this.showError('📧 이메일 전송 한도를 초과했습니다.\n\n해결 방법:\n• 위의 "이메일 확인 건너뛰기" 옵션을 체크하고 재시도\n• 또는 1시간 후 다시 시도해주세요');
                         } else {
-                            this.showError(`회원가입에 실패했습니다: ${error.message}`);
+                            this.showError(`❌ 회원가입에 실패했습니다: ${error.message}`);
                         }
                         return;
                     }
@@ -1827,8 +1829,8 @@
                     const needsEmailConfirmation = data.user && !data.user.email_confirmed_at && !hasSession && !skipEmailVerification;
 
                     if (skipEmailVerification) {
-                        console.log('🔧 개발자 모드: 이메일 확인 건너뛰기');
-                        this.showSuccess('개발자 모드로 회원가입이 완료되었습니다!\n\n이메일 확인 없이 바로 로그인할 수 있습니다.');
+                        console.log('✅ 이메일 확인 건너뛰기 모드');
+                        this.showSuccess('✅ 회원가입이 완료되었습니다!\n\n이메일 확인을 건너뛰어 즉시 로그인됩니다.\n지금부터 모든 기능을 사용할 수 있습니다!');
                     } else if (needsEmailConfirmation) {
                         console.log('📧 이메일 확인 필요 - Supabase에서 "Enable email confirmations"이 활성화되어 있습니다.');
 
