@@ -724,6 +724,54 @@
             <!-- Main App -->
             <main id="main-app" class="main-card">
 
+                <!-- API Key Input Section (for logged-in users) -->
+                <div id="user-api-key-section" style="display: none; margin-bottom: 2rem; padding: 1.5rem; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border: 1px solid #0ea5e9; border-radius: 0.75rem;">
+                    <div style="display: flex; align-items: center; margin-bottom: 1rem;">
+                        <i class="fas fa-key" style="color: #0ea5e9; margin-right: 0.5rem; font-size: 1.125rem;"></i>
+                        <h3 style="margin: 0; color: #0c4a6e; font-size: 1.125rem; font-weight: 600;">Google Gemini API 키</h3>
+                    </div>
+                    <p style="margin: 0 0 1rem 0; color: #0c4a6e; font-size: 0.875rem;">AI 이미지 생성을 위해 Google Gemini API 키를 입력해주세요.</p>
+
+                    <div id="api-key-status" style="margin-bottom: 1rem;">
+                        <div id="api-key-not-set" style="display: block;">
+                            <div style="display: flex; gap: 0.75rem; margin-bottom: 0.75rem;">
+                                <input type="password" id="user-api-key-input" placeholder="AIzaSy로 시작하는 Google Gemini API 키를 입력하세요"
+                                       style="flex: 1; padding: 0.75rem; border: 1px solid #0ea5e9; border-radius: 0.5rem; font-size: 0.875rem; background-color: white;">
+                                <button id="save-user-api-key" style="padding: 0.75rem 1.5rem; background-color: #0ea5e9; color: white; border: none; border-radius: 0.5rem; font-weight: 500; cursor: pointer; transition: background-color 0.2s;">
+                                    저장
+                                </button>
+                            </div>
+                            <p style="margin: 0; font-size: 0.75rem; color: #075985;">
+                                <i class="fas fa-info-circle" style="margin-right: 0.25rem;"></i>
+                                API 키는 브라우저에 안전하게 저장되며, 서버로 전송되지 않습니다.
+                            </p>
+                        </div>
+
+                        <div id="api-key-set" style="display: none;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem; background-color: #dcfce7; border: 1px solid #16a34a; border-radius: 0.5rem;">
+                                <div style="display: flex; align-items: center;">
+                                    <i class="fas fa-check-circle" style="color: #16a34a; margin-right: 0.5rem;"></i>
+                                    <span style="color: #15803d; font-weight: 500; font-size: 0.875rem;">API 키가 설정되었습니다</span>
+                                </div>
+                                <button id="change-user-api-key" style="padding: 0.5rem 1rem; background-color: #f59e0b; color: white; border: none; border-radius: 0.375rem; font-size: 0.75rem; cursor: pointer; transition: background-color 0.2s;">
+                                    변경
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="font-size: 0.75rem; color: #075985;">
+                        <p style="margin: 0 0 0.5rem 0;">
+                            <strong>API 키 발급 방법:</strong>
+                        </p>
+                        <p style="margin: 0;">
+                            1. <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: #0ea5e9; text-decoration: underline;">Google AI Studio</a>에 접속
+                            <br>2. "Create API Key" 클릭하여 새 API 키 생성
+                            <br>3. 생성된 키를 위 입력창에 붙여넣기
+                        </p>
+                    </div>
+                </div>
+
                 <!-- Upload Mode Selection -->
                 <div class="mb-8">
                     <h3>사진을 어떻게 업로드 하시겠어요?</h3>
@@ -1237,9 +1285,9 @@
         // AI Baby Face Predictor - Enhanced with Supabase Auth & Payment System
         class BabyFacePredictor {
             constructor() {
-                // 관리자 API 키 (보안 관리) - async로 로드됨
+                // 사용자 API 키 관리
                 this.apiKey = null;
-                this._cachedApiKey = undefined; // 캐시 초기화
+                this._userApiKey = null; // 사용자 입력 API 키
                 this.inputMode = 'separate';
                 this.generationMode = 'singleAge';
                 this.comparisonType = 'simple';
@@ -1332,72 +1380,39 @@
 
             // ===== 보안 API 관리 =====
             async getSecureApiKey() {
-                // 이미 로드된 키가 있으면 재사용 (캐싱)
-                if (this._cachedApiKey !== undefined) {
-                    console.log('✅ 캐시된 API 키 사용');
-                    return this._cachedApiKey;
-                }
-
-                // 다양한 소스에서 API 키 시도 (보안 순서대로)
+                // 사용자가 입력한 API 키만 사용
                 let apiKey = null;
 
-                // 1. 환경변수에서 시도 (Node.js 환경)
-                if (typeof process !== 'undefined' && process.env && process.env.GEMINI_API_KEY) {
-                    apiKey = process.env.GEMINI_API_KEY;
-                    console.log('✅ 환경변수에서 API 키 로드됨');
-                }
-
-                // 2. 서버 엔드포인트에서 키 가져오기 시도
-                if (!apiKey) {
-                    try {
-                        const response = await fetch('/api/get-key', {
-                            method: 'GET',
-                            credentials: 'same-origin'
-                        });
-                        if (response.ok) {
-                            const data = await response.json();
-                            apiKey = data.apiKey;
-                            console.log('✅ 서버에서 API 키 로드됨');
-                        }
-                    } catch (error) {
-                        console.log('ℹ️ 서버 엔드포인트 없음, 로컬 모드로 진행');
+                // 1. 개발자 모드에서는 개발 키 허용
+                if (this.currentUser && this.currentUser.isDevelopmentUser) {
+                    console.log('🔧 개발자 모드 - 로컬 스토리지 키 사용');
+                    apiKey = localStorage.getItem('dev_gemini_api_key');
+                    if (apiKey) {
+                        console.log('✅ 개발자 모드 API 키 로드됨');
+                        return apiKey;
                     }
                 }
 
-                // 3. 로컬/개발 환경용 관리자 설정 키 (사용량 제한 적용됨)
-                if (!apiKey && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-                    console.log('✅ 개발 환경 감지: 사용량 제한이 적용된 관리자 키 사용');
+                // 2. 사용자 입력 API 키 확인 (세션 또는 로컬 스토리지)
+                if (this.currentUser && this.isAuthenticated) {
+                    // 세션에서 확인
+                    if (this._userApiKey) {
+                        console.log('✅ 세션에서 사용자 API 키 사용');
+                        return this._userApiKey;
+                    }
 
-                    // 사용량 제한이 설정된 키 부분들
-                    const encodedParts = [
-                        'QUl6YVN5Q3RCb1U=',  // AIzaSyCtBoU
-                        'LTM0a3FkZU5UVEttQ1ljc0ZmRjdR',  // -34kqdeNTTKmCYcsFfF7Q
-                        'SWVRYUFBZw==',  // IeQaAAg
-                    ];
-
-                    try {
-                        const keyParts = encodedParts.map(part => atob(part));
-                        apiKey = keyParts.join('');
-                        console.log('✅ API 키 로드 완료 (사용량 제한 적용)');
-                    } catch (error) {
-                        console.error('키 디코딩 실패:', error);
+                    // 로컬 스토리지에서 확인 (사용자별로 저장)
+                    const userKey = `gemini_api_key_${this.currentUser.id}`;
+                    apiKey = localStorage.getItem(userKey);
+                    if (apiKey) {
+                        console.log('✅ 로컬 스토리지에서 사용자 API 키 로드됨');
+                        this._userApiKey = apiKey;
+                        return apiKey;
                     }
                 }
 
-                if (!apiKey) {
-                    console.error('❌ API 키를 찾을 수 없습니다. 관리자에게 문의하세요.');
-                    this.updateServiceStatus('offline');
-                    this._cachedApiKey = null;
-                    return null;
-                }
-
-                // 캐시에 저장
-                this._cachedApiKey = apiKey;
-
-                // API 키 연결 테스트 실행
-                this.testApiConnectivity(apiKey);
-
-                return apiKey;
+                console.log('⚠️ 사용자 API 키가 필요합니다');
+                return null;
             }
 
             async testApiConnectivity(apiKey) {
@@ -1561,6 +1576,7 @@
                     document.getElementById('user-avatar').textContent = userName.charAt(0).toUpperCase();
 
                     this.updateCartUI();
+                    this.updateApiKeyUI(); // API 키 UI 업데이트 추가
                 } else {
                     // 로그아웃 상태
                     authButtons.style.display = 'flex';
@@ -2962,16 +2978,16 @@
             }
 
             setupEventListeners() {
-                // API 키 관리 (관리자 API로 이동되어 더 이상 필요없음)
-                const saveApiKeyBtn = document.getElementById('save-api-key');
-                const changeApiKeyBtn = document.getElementById('change-api-key');
-                const apiKeyInput = document.getElementById('api-key-input');
+                // 사용자 API 키 관리
+                const saveUserApiKeyBtn = document.getElementById('save-user-api-key');
+                const changeUserApiKeyBtn = document.getElementById('change-user-api-key');
+                const userApiKeyInput = document.getElementById('user-api-key-input');
 
-                if (saveApiKeyBtn) saveApiKeyBtn.addEventListener('click', () => this.saveApiKey());
-                if (changeApiKeyBtn) changeApiKeyBtn.addEventListener('click', () => this.changeApiKey());
-                if (apiKeyInput) {
-                    apiKeyInput.addEventListener('keypress', (e) => {
-                        if (e.key === 'Enter') this.saveApiKey();
+                if (saveUserApiKeyBtn) saveUserApiKeyBtn.addEventListener('click', () => this.saveUserApiKey());
+                if (changeUserApiKeyBtn) changeUserApiKeyBtn.addEventListener('click', () => this.changeUserApiKey());
+                if (userApiKeyInput) {
+                    userApiKeyInput.addEventListener('keypress', (e) => {
+                        if (e.key === 'Enter') this.saveUserApiKey();
                     });
                 }
 
@@ -3158,18 +3174,40 @@
             }
 
             checkApiKey() {
-                // 관리자 API 키가 항상 사용 가능하므로 메인 앱을 표시
+                // 로그인 상태에 따라 API 키 섹션 표시
+                this.updateApiKeyUI();
                 document.getElementById('main-app').style.display = 'block';
+            }
 
-                // API 키 입력 섹션이 존재하면 숨김 (제거된 경우 에러 방지)
-                const apiKeySection = document.getElementById('api-key-section');
-                if (apiKeySection) {
+            updateApiKeyUI() {
+                const apiKeySection = document.getElementById('user-api-key-section');
+                const apiKeyNotSet = document.getElementById('api-key-not-set');
+                const apiKeySet = document.getElementById('api-key-set');
+
+                if (!apiKeySection) return;
+
+                // 로그인 상태 확인
+                if (this.isAuthenticated && this.currentUser) {
+                    apiKeySection.style.display = 'block';
+
+                    // API 키 설정 상태 확인
+                    const userKey = `gemini_api_key_${this.currentUser.id}`;
+                    const hasApiKey = localStorage.getItem(userKey) || this._userApiKey;
+
+                    if (hasApiKey) {
+                        apiKeyNotSet.style.display = 'none';
+                        apiKeySet.style.display = 'block';
+                    } else {
+                        apiKeyNotSet.style.display = 'block';
+                        apiKeySet.style.display = 'none';
+                    }
+                } else {
                     apiKeySection.style.display = 'none';
                 }
             }
 
-            saveApiKey() {
-                const input = document.getElementById('api-key-input');
+            async saveUserApiKey() {
+                const input = document.getElementById('user-api-key-input');
                 const key = input.value.trim();
 
                 if (!key) {
@@ -3177,17 +3215,49 @@
                     return;
                 }
 
-                this.apiKey = key;
-                localStorage.setItem('geminiApiKey', key);
-                input.value = '';
-                this.checkApiKey();
-                this.clearError();
+                if (!key.startsWith('AIza')) {
+                    this.showError('올바른 Google Gemini API 키 형식이 아닙니다. (AIza로 시작해야 함)');
+                    return;
+                }
+
+                if (!this.currentUser) {
+                    this.showError('로그인이 필요합니다.');
+                    return;
+                }
+
+                try {
+                    // API 키 유효성 검사
+                    const testUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${key}`;
+                    const response = await fetch(testUrl, { method: 'GET' });
+
+                    if (!response.ok) {
+                        throw new Error(`API 키 검증 실패: ${response.status}`);
+                    }
+
+                    // 사용자별로 API 키 저장
+                    const userKey = `gemini_api_key_${this.currentUser.id}`;
+                    localStorage.setItem(userKey, key);
+                    this._userApiKey = key;
+
+                    input.value = '';
+                    this.updateApiKeyUI();
+                    this.showSuccess('API 키가 성공적으로 저장되었습니다!');
+
+                } catch (error) {
+                    console.error('API 키 검증 오류:', error);
+                    this.showError('API 키가 유효하지 않습니다. 다시 확인해주세요.');
+                }
             }
 
-            changeApiKey() {
-                this.apiKey = '';
-                localStorage.removeItem('geminiApiKey');
-                this.checkApiKey();
+            changeUserApiKey() {
+                if (!this.currentUser) return;
+
+                const userKey = `gemini_api_key_${this.currentUser.id}`;
+                localStorage.removeItem(userKey);
+                this._userApiKey = null;
+
+                this.updateApiKeyUI();
+                this.showSuccess('API 키가 제거되었습니다. 새 키를 입력해주세요.');
             }
 
             setInputMode(mode) {
@@ -3668,7 +3738,11 @@
                 }
 
                 if (!this.apiKey) {
-                    throw new Error('API 키를 찾을 수 없습니다. 관리자에게 문의하세요.');
+                    if (this.currentUser && this.currentUser.isDevelopmentUser) {
+                        throw new Error('개발자 모드: API 키가 필요합니다. localStorage에 "dev_gemini_api_key"를 설정하세요.');
+                    } else {
+                        throw new Error('Google Gemini API 키가 필요합니다. 위의 API 키 입력란에서 키를 설정해주세요.');
+                    }
                 }
 
                 try {
@@ -4440,7 +4514,7 @@ CRITICAL: Respond with only the generated image. Do not provide text description
                         this.updateAuthUI();
                         this.loadCartItems();
 
-                        this.showSuccess('🔧 개발자 모드 활성화됨!\n\n임시 로그인 완료 - 모든 기능 테스트 가능\n\n개발 계정: dev@test.com\n장바구니 초기화됨');
+                        this.showSuccess('🔧 개발자 모드 활성화됨!\n\n임시 로그인 완료 - 모든 기능 테스트 가능\n\n개발 계정: dev@test.com\n장바구니 초기화됨\n\n📝 API 키 설정:\nlocalStorage.setItem("dev_gemini_api_key", "your_api_key");\n또는 위의 API 키 입력란을 사용하세요.');
 
                         // 추가 테스트 계정 생성 (백그라운드)
                         this.createDevTestAccount();
