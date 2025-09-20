@@ -1302,18 +1302,11 @@
                 // Supabase 클라이언트 초기화
                 this.supabase = window.supabase.createClient(this.supabaseUrl, this.supabaseAnonKey);
 
-                // Polar 클라이언트 초기화
-                try {
-                    this.polar = new window.Polar.Configuration({
-                        accessToken: this.polarAccessToken,
-                        server: "https://api.polar.sh"
-                    });
-                    this.polarApi = new window.Polar.ProductsApi(this.polar);
-                    this.polarCheckoutApi = new window.Polar.CheckoutApi(this.polar);
-                } catch (error) {
-                    console.warn('Polar SDK not available, using fallback implementation');
-                    this.polar = null;
-                }
+                // Polar 클라이언트 초기화 (비동기 로딩 대기)
+                this.polar = null;
+                this.polarApi = null;
+                this.polarCheckoutApi = null;
+                this.initializePolarSDK();
 
                 // 현재 사용자
                 this.currentUser = null;
@@ -1376,6 +1369,40 @@
                 this.currentHighlightedFeature = null;
 
                 this.init();
+            }
+
+            // ===== Polar SDK 초기화 =====
+            async initializePolarSDK() {
+                let retryCount = 0;
+                const maxRetries = 10;
+                const retryDelay = 200; // 200ms
+
+                while (retryCount < maxRetries) {
+                    try {
+                        if (window.Polar && window.Polar.Configuration) {
+                            this.polar = new window.Polar.Configuration({
+                                accessToken: this.polarAccessToken,
+                                server: "https://api.polar.sh"
+                            });
+                            this.polarApi = new window.Polar.ProductsApi(this.polar);
+                            this.polarCheckoutApi = new window.Polar.CheckoutApi(this.polar);
+                            console.log('✅ Polar SDK 초기화 완료');
+                            return;
+                        }
+                    } catch (error) {
+                        console.warn(`Polar SDK 초기화 시도 ${retryCount + 1}/${maxRetries} 실패:`, error);
+                    }
+
+                    retryCount++;
+                    if (retryCount < maxRetries) {
+                        await new Promise(resolve => setTimeout(resolve, retryDelay));
+                    }
+                }
+
+                console.warn('⚠️ Polar SDK 로드 실패 - 폴백 구현 사용');
+                this.polar = null;
+                this.polarApi = null;
+                this.polarCheckoutApi = null;
             }
 
             // ===== 보안 API 관리 =====
